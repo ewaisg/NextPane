@@ -1,7 +1,7 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-21 (f) by Subagent 6 (QA): re-verification after S1 commit 180b0c0 — 13/14 Phase 1 items verified; P1.02 rejected (uninstall purge mechanism).
+> Last update: 2026-10-21 (g) by Subagent 1: P1.02 uninstall user-data mechanism reworked (app-owned per-user removal + per-user-install-only uninstaller purge via `Exec`) → `[READY_FOR_QA]`.
 
 ## 1. Executive summary
 
@@ -13,10 +13,13 @@ The build → test → publish → installer pipeline (P1.11) is scripted in `en
 
 **Phase 1 status:**
 - `[VERIFIED_COMPLETE]` (S6, 2026-10-21): P1.01, P1.03–P1.14 except P1.02 — 13 of 14.
-- `[IN_PROGRESS]`: **P1.02** — §19.3/§21 have the uninstaller run `NexPane.exe --purge-user-data` via Inno `ExecAsOriginalUser`, which Inno does not support at uninstall time (Inno help, ExecAsOriginalUser › Remarks). S1 must choose a supported mechanism and update P4.43/P7.14.
-- Phase 1 is therefore not formally complete, but the open defect only affects uninstall design (Phase 4/7).
+- `[READY_FOR_QA]`: **P1.02**. The uninstall user-data design no longer uses `ExecAsOriginalUser`.
+  - Per-user data is removed by the app, per user (Settings › Privacy › "Remove my NexPane data…" / `--purge-user-data`, P4.43).
+  - The uninstaller purges only for per-user installs, via plain `Exec`, on an explicit Yes.
+  - Admin-mode uninstalls keep per-user data and tell the user how to remove it.
+  - See ARCHITECTURE §19.3 and §21 "P1.02 rework". Waiting for the S6 re-run.
 
-Phase 2 (S7, branding) and Phase 3 (S2, core systems) can start in parallel now.
+Phase 2 (S7, branding) and Phase 3 (S2, core systems, in its own worktree `.worktrees\phase3` on branch `phase3-core-search`) run in parallel. Do not edit that worktree from `main`.
 
 ## 2. Files currently being worked on
 
@@ -31,7 +34,7 @@ Phase 2 (S7, branding) and Phase 3 (S2, core systems) can start in parallel now.
 | `eng/common.ps1`, `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss` | Complete, `[READY_FOR_QA]` (P1.11); pipeline verified end-to-end → `dist\NexPane-Setup.exe` (52.8 MB). The `.iss` still needs the WebView2 bootstrapper and real branding in P7.08 |
 | `eng/check-placeholders.ps1`, `eng/placeholder-allowlist.json`, `tests/NexPane.Architecture.Tests/PlaceholderScannerTests.cs` | `[VERIFIED_COMPLETE]` (P1.12). QA owns the allowlist |
 | `.gitignore`, `THIRD-PARTY-NOTICES.txt`, ARCHITECTURE §22 / P1.14 sections | `[VERIFIED_COMPLETE]` (P1.07, P1.13, P1.08, P1.14). `.gitignore` is guarded by `tests/NexPane.Architecture.Tests/GitIgnoreTests.cs` |
-| `ARCHITECTURE.md` §19.3 + §21 (uninstall user-data purge) | `[IN_PROGRESS]` — P1.02 QA reject: `ExecAsOriginalUser` is unsupported at uninstall time |
+| `ARCHITECTURE.md` §19.3 + §21 (uninstall user-data handling), TODO P4.43 / P7.14 | `[READY_FOR_QA]` (P1.02 rework by S1, 2026-10-21 g) |
 | `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss`, `eng/placeholder-allowlist.json` | Cross-references reworded to "task(s) P1.11"; the allowlist is empty; scanner exit 0 |
 | Next up | S1: fix P1.02 (purge mechanism) → S6 re-run. In parallel: S7 Phase 2 (P2.01, P2.02), S2 Phase 3 (P3.01, P3.03) |
 
@@ -149,7 +152,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
 20. **GPU Whisper** runtimes (CUDA and Vulkan) are optional downloads into `%LOCALAPPDATA%\NexPane\runtimes\`. They are never bundled in the installer, and loading must always fall back to CPU without crashing (ARCHITECTURE §13.2).
 21. **Inno Setup 6.7.3** is installed. ISPP `RemoveBackslash` is deprecated (it causes a warning, which fails `eng/installer.ps1`), so use `RemoveBackslashUnlessRoot`. Language-specific custom messages use a dot (`english.Name=`), not a colon. ISCC writes compile errors to stderr. Index Service setup lives in the `.iss` `[Code]` section (ARCHITECTURE §21), not in `[Run]`.
 22. **`.gitignore` rule (P1.07 fix):** the repo has `core.ignorecase=true`, so every directory pattern must be anchored (`/models/`) or scoped to a project folder (`/src/*/[Bb]in/`). Never add an unanchored folder pattern. `tests/TestAssets/**` is always re-included. Check new patterns with `git check-ignore -v <path>` and `git status --ignored`. With `-v`, a negation match (`!…`) also exits 0, so use `git check-ignore -q` (exit 1 = not ignored) to test. Long scratch paths (> 260 chars, e.g. the agent scratchpad) make `dotnet` fail with "The directory name is invalid"; use a short `%TEMP%\...` folder for throwaway projects.
-23. **Inno uninstaller limits (QA, P1.02):** `ExecAsOriginalUser`/`ShellExecAsOriginalUser` and the `runasoriginaluser` flag are **not supported at uninstall time** (Inno help, ExecAsOriginalUser › Remarks); the elevated uninstaller's `{localappdata}`/`{userappdata}` may be the admin's profile. Inno Pascal cannot call WinRT (`PasswordVault`). Design per-user cleanup around these limits. `.gitignore` regressions are caught by `GitIgnoreTests`.
+23. **Inno uninstaller limits (QA, P1.02):** `ExecAsOriginalUser`/`ShellExecAsOriginalUser` and the `runasoriginaluser` flag are **not supported at uninstall time** (Inno help, ExecAsOriginalUser › Remarks); the elevated uninstaller's `{localappdata}`/`{userappdata}` may be the admin's profile. Inno Pascal cannot call WinRT (`PasswordVault`). Inno's help also says that, in administrative install mode, user-level files and settings "must be handled by the application itself".
+    - **Resulting design** (ARCHITECTURE §19.3, §21 "P1.02 rework"):
+      - per-user data is removed by the app (P4.43);
+      - the uninstaller purges only for per-user installs (uninstall key under HKCU), via plain `Exec` (same credentials as the uninstaller) at `usUninstall`, on Yes only, never silent;
+      - in admin mode the uninstaller never deletes `{localappdata}`/`{userappdata}` content.
+    - Verify any Inno API against the local help. `hh.exe -decompile` fails on paths over MAX_PATH, so decompile into a scratch folder using its 8.3 short path.
+    - `.gitignore` regressions are caught by `GitIgnoreTests`.
 
 ## 7. Working rules
 
@@ -185,4 +194,4 @@ Renumbered 2026-10-21 at the user's mandate, by role. Mapping: old S2 → S7; ol
 | D3 | Index Service installer task is **checked by default** for admin installs, with a privacy note. |
 | D4 | Replacing Explorer as the default folder handler is **out of scope** for v1. |
 | D5 | GPU Whisper (optional download of roughly 500 MB) is **in scope** for v1 (TODO P6.26–P6.30). |
-| P1.14 | Network credentials → **Windows Credential Locker** (`PasswordVault`); AI keys → **DPAPI / Credential Manager**. Uninstall "remove user data" (default No) purges both stores plus `%LOCALAPPDATA%\NexPane` and `%APPDATA%\NexPane` for the installing user via `NexPane.exe --purge-user-data` (P4.43, P7.14). |
+| P1.14 | Network credentials → **Windows Credential Locker** (`PasswordVault`); AI keys → **DPAPI / Credential Manager**. Each user removes their own data (both stores plus `%LOCALAPPDATA%\NexPane` and `%APPDATA%\NexPane`) in the app (Settings › Privacy › "Remove my NexPane data…" / `--purge-user-data`, P4.43). The uninstaller offers the same purge only for per-user installs (P7.14, §19.3). |

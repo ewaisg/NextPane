@@ -1,14 +1,14 @@
 # NexPane — Current State
 
 > Updated by every subagent at the end of every session. Newest entry is at the top of the Session Log.
-> Last update: **2026-10-21 (f)** by **Subagent 6 (QA, Verification & Security Inspector)**: re-verification after S1 commit 180b0c0.
+> Last update: **2026-10-21 (g)** by **Subagent 1 (Lead Architect & State Scribe)**: P1.02 uninstall user-data mechanism reworked (no `ExecAsOriginalUser`) → `[READY_FOR_QA]`.
 > Roster (user-mandated numbering): S1 Architect & State Scribe · S2 Core Systems & Indexing Engine · S3 Native Windows Shell & OS Integration · S4 AI & Semantic Pipeline · S5 UI/UX & Workspace · **S6 QA, Verification & Security Inspector (veto)** · S7 Release & Installer Packaging (incl. icons/assets). Older log entries below that say "S7 QA role" refer to the QA role, which is now **S6**.
 
 ## 1. Snapshot
 
 | Item | Value |
 |---|---|
-| Current phase | **Phase 1 — NOT complete: 13/14 `[VERIFIED_COMPLETE]`.** P1.02 rejected again → `[IN_PROGRESS]` (S1): the uninstall-time purge in §19.3/§21 relies on Inno `ExecAsOriginalUser`, which Inno does not support at uninstall time. Phase 2 (S7) and Phase 3 (S2) may start now |
+| Current phase | **Phase 1 — 13/14 `[VERIFIED_COMPLETE]`; P1.02 `[READY_FOR_QA]`** (S1 rework: per-user data is removed by the app per user; the uninstaller purges only for per-user installs via plain `Exec`; nothing uses `ExecAsOriginalUser`). Phase 2 (S7) and Phase 3 (S2, worktree `.worktrees\phase3`, branch `phase3-core-search`) are in progress / may start |
 | Placeholder scanner (P1.12) | `eng\check-placeholders.ps1` → **26 files, 0 violations, 0 allowlisted, 0 stale, exit 0**. The four `TODO P1.11` cross-references now read "task(s) P1.11"; `eng\placeholder-allowlist.json` has `"entries": []` |
 | Toolchain | .NET SDK 10.0.402, Git 2.55.0, Inno Setup 6.7.3 (per-user: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) |
 | Pipeline (P1.11) | `eng\build.ps1` → `eng\publish.ps1` → `eng\installer.ps1 -AllowMissingBranding` → unversioned `dist\NexPane-Setup.exe` (55.35 MB, ProductVersion 0.1.0; never executed) |
@@ -19,7 +19,7 @@
 | App | `NexPane.exe` opens a 1280×800 window titled "NexPane" and exits 0 on `CloseMainWindow` |
 | Feature code | None yet |
 | User decisions | D1–D5 (ARCHITECTURE §20) + P1.14 (§21): network credentials in the Windows Credential Locker; AI keys via DPAPI/Credential Manager |
-| Blockers | None for Phase 2/3. P1.02 open (uninstall purge mechanism; affects P4.43/P7.14 only) |
+| Blockers | None. P1.02 waits for the S6 re-run |
 
 ## 2. What exists on disk (tracked)
 
@@ -38,6 +38,21 @@ C:\Users\Ewais\Projects\NexPane\
 Package pins: Microsoft.Extensions.Hosting.WindowsServices 10.0.13, xunit.v3.mtp-v2 4.0.2, FluentAssertions [7.2.0], BenchmarkDotNet 0.15.8.
 
 ## 3. Just finished
+
+**2026-10-21 (g), S1: P1.02 rework — uninstall-time user-data removal**
+- **Research.** I decompiled the installed Inno Setup 6.7.3 help (`ISetup.chm`) into the S1 scratchpad (via its 8.3 short path, because `hh.exe` fails on long paths) and checked the APIs. The copy was deleted afterwards.
+  - `ExecAsOriginalUser`: "not supported at uninstall time".
+  - `Exec`: runs "using the same credentials as Setup/Uninstall"; no uninstall restriction.
+  - *Non Administrative Install Mode*: in administrative install mode, "user-level files and settings must be handled by the application itself, and never in an administrative install mode installer".
+  - `IsAdminInstallMode` is True "if Uninstall is running with administrative privileges".
+- **Mechanism chosen** (options (a) + (c)), in ARCHITECTURE §19.3 and §21 "P1.02 rework" (the old row is struck through):
+  1. Per-user data (both NexPane folders, Credential Manager `NexPane:*`, Credential Locker `NexPane:net`) is removed **by the app, per user**: Settings › Privacy › "Remove my NexPane data…" and `NexPane.exe --purge-user-data` (P4.43).
+  2. The uninstaller always removes machine-wide items.
+  3. In admin mode it never touches per-user data; it tells the user what was kept and how to remove it.
+  4. For **per-user installs** (its uninstall key is in the running account's HKCU) it asks, default No, and on Yes runs plain `Exec` of `{app}\NexPane.exe --purge-user-data` at `usUninstall`. Silent uninstalls never purge.
+  5. Rejected, with reasons in §21: HKCU RunOnce cleanup, and a WTS session-user comparison.
+- **TODO:** P4.43 and P7.14 acceptance rewritten (admin-mode keeps data with a message; per-user Yes/No/silent cases; `.iss` grep for no `ExecAsOriginalUser` or user-folder `DelTree`). §22 E3 updated. P1.02 → `[READY_FOR_QA]`.
+- **Checks:** build 0 warnings / 0 errors; tests **108/108**; `check-placeholders.ps1` exit 0. Phase 3 worktree not touched.
 
 **2026-10-21 (f), S6 QA: re-verification of S1 commit 180b0c0**
 
@@ -71,7 +86,7 @@ TODO totals: 183 items: 9 VERIFIED_COMPLETE, 5 READY_FOR_QA, the rest PENDING.
 
 | Item | Owner | Status | Notes |
 |---|---|---|---|
-| P1.02 uninstall purge mechanism | S1 | `[IN_PROGRESS]` (QA reject) | Replace `ExecAsOriginalUser` (unsupported at uninstall) with a supported mechanism, record in §21, update P4.43/P7.14 acceptance; then S6 re-runs |
+| P1.02 uninstall user-data mechanism | S6 | waiting (S1 → `[READY_FOR_QA]`) | Re-run: §19.3, the §21 "P1.02 rework" row, P4.43, P7.14 |
 | Phase 2 (branding/assets) | **S7** | `[PENDING]` | Start with P2.01 (logo SVGs), then P2.02 (`tools\NexPane.AssetGen`) |
 | Phase 3 (core FS, indexer, search) | **S2** | `[PENDING]` | Start with P3.01 (VfsPath) and P3.03 (Storage migrations). Can run in parallel with Phase 2 now that `.gitignore` is safe |
 
@@ -90,7 +105,8 @@ TODO totals: 183 items: 9 VERIFIED_COMPLETE, 5 READY_FOR_QA, the rest PENDING.
    - Release builds must compile without `-AllowMissingBranding`.
    - The service and verbs have never been executed.
    - Signing is untested because signtool is absent.
-   - `usPostUninstall` still deletes only `{localappdata}\NexPane`; the designed `--purge-user-data` flow (P4.43 + P7.14) replaces it.
+   - `usPostUninstall` still deletes `{localappdata}\NexPane`, even in admin mode. P7.14 removes this and implements §19.3: admin mode keeps per-user data and shows a message; per-user installs offer a purge via `Exec` of `--purge-user-data`.
+   - Users of admin-mode installs must remove their data in-app (P4.43) **before** uninstalling; afterwards it can only be removed manually (the two folders and the `NexPane:` entries in Credential Manager). The uninstaller's final message says so.
 7. **Credential Locker limit:** Microsoft documents a ten-credentials-per-app limit. It was not enforced for an unpackaged process on this machine (15 stored), but P5.31 must surface `PasswordVault.Add` failures and test 25 connections.
 8. New code must pass `eng\check-placeholders.ps1`, which runs in the default suite. Allowlist entries are added only by QA, each with a justification.
 9. `eng\publish.ps1` rebuilds App and IndexService self-contained, so the next `eng\build.ps1` recompiles those two projects (expected).
@@ -104,12 +120,17 @@ git status; git log --oneline -3
 dotnet build NexPane.sln -c Release
 dotnet test --solution NexPane.sln -c Release --filter-not-trait "Category=Elevated" --filter-not-trait "Category=Live"
 powershell -NoProfile -ExecutionPolicy Bypass -File eng\check-placeholders.ps1               # exit 0 expected
-# QA (S6) re-run for P1.07:
-git check-ignore src/NexPane.Core/Models/VfsEntry.cs src/NexPane.Security/Secrets/x.cs src/NexPane.App/Packages/x.cs src/NexPane.Core/Logs/x.cs src/NexPane.Core/Log/x.cs tests/TestAssets/content/a.bak   # prints nothing, exit 1
-# Then: Phase 2 → S7 (P2.01, P2.02), Phase 3 → S2 (P3.01, P3.03) in parallel.
+# QA (S6) re-run for P1.02: review ARCHITECTURE §19.3 "Uninstall ... per-user data" and §21 "P1.02 rework"; confirm no design relies on ExecAsOriginalUser:
+Select-String -Path docs\handoff\ARCHITECTURE.md -Pattern 'ExecAsOriginalUser'   # only the documented-limitation sentence in §19.3 and the struck-through §21 row
+# Phase 2 → S7 (P2.01, P2.02); Phase 3 → S2 in .worktrees\phase3 (branch phase3-core-search) — do not edit that worktree from main.
 ```
 
 ## 7. Session log
+
+### 2026-10-21 (g) — Subagent 1 (Lead Architect & State Scribe)
+- Reworked the P1.02 uninstall user-data mechanism after S6's rejection, verifying every Inno API against the installed 6.7.3 help.
+- Chose app-owned per-user removal (P4.43) plus an uninstaller purge only for per-user installs via plain `Exec`. Recorded in §19.3/§21; P4.43/P7.14 acceptance and §22 E3 updated.
+- Build 0/0, tests 108/108, scan exit 0. Scratchpad help copy deleted. Did not touch `.worktrees\phase3`.
 
 ### 2026-10-21 (f) — Subagent 6 (QA, Verification & Security Inspector)
 - Re-ran P1.02, P1.07, P1.08, P1.13, P1.14 independently after 180b0c0; verdicts in §3. Checked the roster remap in TODO.md.
