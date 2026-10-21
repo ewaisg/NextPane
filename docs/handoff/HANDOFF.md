@@ -1,7 +1,7 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-21 by Subagent 1 (Lead Architect & State Scribe).
+> Last update: 2026-10-21 by Subagent 7 (Release & Installer Packaging, P1.11).
 
 ## 1. Executive summary
 
@@ -9,7 +9,7 @@ NexPane is a production-grade, AI-powered Windows file explorer: C# / **.NET 10 
 
 Phase 1 is complete up to QA. The toolchain is installed. The git repository (`main`) and `NexPane.sln` exist, with 15 `src` projects layered per ARCHITECTURE §4, 16 xUnit v3 test projects and a benchmarks runner. The solution builds with 0 warnings and 0 errors, and 47 of 47 tests pass. The app opens an empty window titled "NexPane". The IndexService is a Windows-service host skeleton that starts and stops cleanly. No feature code exists yet.
 
-Next: P1.11 and P1.12 (eng scripts and the placeholder scanner), then Phase 2 (branding, S2) and Phase 3 (core FS, indexer and search, S3), which can run in parallel.
+The build → test → publish → installer pipeline (P1.11) is scripted in `eng\` and verified end-to-end. Next: P1.12 (the placeholder scanner), then Phase 2 (branding, S2) and Phase 3 (core FS, indexer and search, S3), which can run in parallel.
 
 ## 2. Files currently being worked on
 
@@ -21,7 +21,8 @@ Next: P1.11 and P1.12 (eng scripts and the placeholder scanner), then Phase 2 (b
 | `src/*` | Project shells only (no code), except `NexPane.App` (MainWindow) and `NexPane.IndexService` (`Program.BuildHost`) |
 | `tests/NexPane.Architecture.Tests` | Layering + convention tests, `[READY_FOR_QA]` (P1.10) |
 | `tests/Shared/ModuleAssembly.cs` | Shared helper linked into every `*Tests` project (x64 / target framework assertions) |
-| Next up | `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1` (P1.11), `eng/check-placeholders.ps1` (P1.12) |
+| `eng/common.ps1`, `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss` | Complete, `[READY_FOR_QA]` (P1.11); pipeline verified end-to-end → `dist\NexPane-Setup-0.1.0.exe` (52.8 MB). The `.iss` still needs the WebView2 bootstrapper and real branding in P7.08 |
+| Next up | `eng/check-placeholders.ps1` (P1.12) |
 
 ## 3. Environment setup
 
@@ -83,13 +84,28 @@ dotnet publish src/NexPane.IndexService -c Release -r win-x64 --self-contained -
 # Branding assets (Phase 2, after P2.02 creates the tool)
 dotnet run -c Release --project tools/NexPane.AssetGen -- --svg assets/brand/nexpane-logo.svg --mark assets/brand/nexpane-mark.svg --out assets
 
-# Installer (Phase 7) → dist\NexPane-Setup-<version>.exe
-& $Iscc installer\NexPane.iss
+# Installer → dist\NexPane-Setup-<version>.exe (version = <Version> in Directory.Build.props)
+& $Iscc /DAppVersion=0.1.0 /DPublishDir=C:\Users\Ewais\Projects\NexPane\build\publish\win-x64 installer\NexPane.iss
 ```
 
 Build outputs: `NexPane.exe` is in `src/NexPane.App/bin/Release/net10.0-windows10.0.19041.0/win-x64/` (the App's `AssemblyName` is `NexPane`).
 
-Wrapper scripts (P1.11) will be `eng/build.ps1`, `eng/publish.ps1` and `eng/installer.ps1`. **Code signing is an optional step that is skipped by default:** `eng/publish.ps1` signs only when `NEXPANE_SIGN_CERT_THUMBPRINT` is set, and v1 ships unsigned. `build/` and `dist/` are git-ignored output folders.
+**Pipeline scripts (P1.11) — use these.** Each one stops at the first non-zero exit code, prints `ERROR: ...` and exits with that code; `-DryRun` prints the exact commands without running them.
+
+```powershell
+$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
+Set-Location C:\Users\Ewais\Projects\NexPane
+powershell -NoProfile -ExecutionPolicy Bypass -File eng\build.ps1       # restore, build Release, default test suite  [-SkipTests] [-DryRun]
+powershell -NoProfile -ExecutionPolicy Bypass -File eng\publish.ps1     # cleans + publishes App and IndexService into build\publish\win-x64  [-DryRun]
+powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1   # ISCC → dist\NexPane-Setup-<version>.exe  [-DryRun]
+# Before Phase 2 delivers the branding assets, the installer step fails on purpose. For pipeline verification ONLY:
+powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMissingBranding
+```
+
+- `-AllowMissingBranding` passes `/DNoBranding` to ISCC, which leaves out `SetupIconFile`, `WizardImageFile` and `WizardSmallImageFile`. It exists only to verify the pipeline before Phase 2. **Phase 7 release builds must not use it.** Without the switch, missing `assets\icons\NexPane.ico` or `assets\installer\wizard-*.bmp` / `wizard-small-*.bmp` fail both `installer.ps1` and the `.iss` (`#error`).
+- `installer.ps1` treats any ISCC `Warning:` line as an error, because P7.08 requires a warning-free compile.
+- **Code signing is an optional step that is skipped by default.** `publish.ps1` (both exes) and `installer.ps1` (setup exe) sign only when `NEXPANE_SIGN_CERT_THUMBPRINT` is set; `NEXPANE_SIGN_TIMESTAMP_URL` is optional. Otherwise they print "signing skipped (NEXPANE_SIGN_CERT_THUMBPRINT not set)". v1 ships unsigned.
+- `build/` and `dist/` are git-ignored output folders. **Never run `dist\NexPane-Setup-*.exe` on the dev machine;** installer testing happens in Windows Sandbox (P7.09).
 
 ## 6. Architectural gotchas (read before writing code)
 
@@ -113,6 +129,7 @@ Wrapper scripts (P1.11) will be `eng/build.ps1`, `eng/publish.ps1` and `eng/inst
 18. **Microsoft.Testing.Platform:** `dotnet test` needs `--solution`/`--project`. VSTest-style `--filter "Category!=X"` does not work; use `--filter-trait` / `--filter-not-trait`.
 19. **Analyzers:** `AnalysisLevel=latest-recommended` with warnings as errors. CA2007 (`ConfigureAwait`) is enforced in libraries but disabled in `NexPane.App` and in tests. Executable types should be `internal`; WPF XAML uses `x:ClassModifier="internal"`.
 20. **GPU Whisper** runtimes (CUDA and Vulkan) are optional downloads into `%LOCALAPPDATA%\NexPane\runtimes\`. They are never bundled in the installer, and loading must always fall back to CPU without crashing (ARCHITECTURE §13.2).
+21. **Inno Setup 6.7.3** is installed. ISPP `RemoveBackslash` is deprecated (it causes a warning, which fails `eng/installer.ps1`), so use `RemoveBackslashUnlessRoot`. Language-specific custom messages use a dot (`english.Name=`), not a colon. ISCC writes compile errors to stderr. Index Service setup lives in the `.iss` `[Code]` section (ARCHITECTURE §21), not in `[Run]`.
 
 ## 7. Working rules
 

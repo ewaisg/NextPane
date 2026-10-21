@@ -94,6 +94,7 @@ C:\Users\Ewais\Projects\NexPane\
 ├─ docs/
 │  └─ handoff/  ARCHITECTURE.md  TODO.md  STATE.md  HANDOFF.md
 ├─ eng/                             # build scripts (build/ and dist/ are OUTPUT dirs, git-ignored)
+│  ├─ common.ps1                    # shared helpers (fail-fast native calls, -DryRun, optional signing)
 │  ├─ build.ps1                     # restore + build + test
 │  ├─ publish.ps1                   # self-contained publish to build\publish\win-x64
 │  └─ installer.ps1                 # runs ISCC.exe → dist\NexPane-Setup-<ver>.exe
@@ -1521,6 +1522,8 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 | 2026-10-21 | App `AssemblyName=NexPane` (→ `NexPane.exe`); `RuntimeIdentifier=win-x64` only on App and IndexService; `PlatformTarget=x64` globally; NuGet audit warnings NU1901–NU1904 not promoted to errors | Installer/registry paths use `NexPane.exe`; avoid RID-specific outputs for libraries; audit findings are release blockers in P7.04 instead of breaking local builds |
 | 2026-10-21 | D1–D5 user decisions (§20) | Recorded from user answers |
 | 2026-10-21 | GPU Whisper via on-demand CUDA/Vulkan packs with hash-pinned downloads, CPU fallback | D5; keeps installer size unchanged |
+| 2026-10-21 | P1.11: Index Service install/upgrade/uninstall is done in the `.iss` `[Code]` section (`sc.exe query/create/config/description/start/delete`, synchronous `net stop`) instead of `[Run]`/`[UninstallRun]` entries; same commands and service settings as §19.3 | Exit codes are checked (non-fatal error dialog, walker fallback), an existing service is reconfigured on upgrade instead of `sc create` failing, the service is fully stopped before files are replaced/removed, and deselecting the task on upgrade removes the service |
+| 2026-10-21 | P1.11: shared `eng/common.ps1`; every eng script has `-DryRun`; ISCC warnings fail `eng/installer.ps1`; `eng/installer.ps1 -AllowMissingBranding` (→ ISCC `/DNoBranding`) omits icon/wizard-image directives **for pre-Phase-2 pipeline verification only** — release builds (P7.08) must not use it; without it, missing branding assets fail both the script and the `.iss` (`#error`) | Pipeline verifiable before Phase 2 without dummy icons |
 
 ---
 
