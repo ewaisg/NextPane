@@ -1,14 +1,14 @@
 # NexPane — Current State
 
 > Updated by every subagent at the end of every session. Newest entry is at the top of the Session Log.
-> Last update: **2026-10-21 (g)** by **Subagent 1 (Lead Architect & State Scribe)**: P1.02 uninstall user-data mechanism reworked (no `ExecAsOriginalUser`) → `[READY_FOR_QA]`.
+> Last update: **2026-10-21 (h)** by **Subagent 6 (QA, Verification & Security Inspector)**: P1.02 re-verified after 61f0577 → rejected (4 consistency defects).
 > Roster (user-mandated numbering): S1 Architect & State Scribe · S2 Core Systems & Indexing Engine · S3 Native Windows Shell & OS Integration · S4 AI & Semantic Pipeline · S5 UI/UX & Workspace · **S6 QA, Verification & Security Inspector (veto)** · S7 Release & Installer Packaging (incl. icons/assets). Older log entries below that say "S7 QA role" refer to the QA role, which is now **S6**.
 
 ## 1. Snapshot
 
 | Item | Value |
 |---|---|
-| Current phase | **Phase 1 — 13/14 `[VERIFIED_COMPLETE]`; P1.02 `[READY_FOR_QA]`** (S1 rework: per-user data is removed by the app per user; the uninstaller purges only for per-user installs via plain `Exec`; nothing uses `ExecAsOriginalUser`). Phase 2 (S7) and Phase 3 (S2, worktree `.worktrees\phase3`, branch `phase3-core-search`) are in progress / may start |
+| Current phase | **Phase 1 — NOT complete: 13/14 `[VERIFIED_COMPLETE]`; P1.02 `[IN_PROGRESS]`** (S6 reject after 61f0577: mechanism verified against the Inno 6.7.3 help, but §13.2 GPU row, P6.30 and P7.08 still promise uninstaller removal in admin mode, and §19.3 vs P7.14/P4.43 disagree on admin-vs-per-user precedence). Phase 2 (S7) and Phase 3 (S2, worktree `.worktrees\phase3`) continue in parallel |
 | Placeholder scanner (P1.12) | `eng\check-placeholders.ps1` → **26 files, 0 violations, 0 allowlisted, 0 stale, exit 0**. The four `TODO P1.11` cross-references now read "task(s) P1.11"; `eng\placeholder-allowlist.json` has `"entries": []` |
 | Toolchain | .NET SDK 10.0.402, Git 2.55.0, Inno Setup 6.7.3 (per-user: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) |
 | Pipeline (P1.11) | `eng\build.ps1` → `eng\publish.ps1` → `eng\installer.ps1 -AllowMissingBranding` → unversioned `dist\NexPane-Setup.exe` (55.35 MB, ProductVersion 0.1.0; never executed) |
@@ -38,6 +38,12 @@ C:\Users\Ewais\Projects\NexPane\
 Package pins: Microsoft.Extensions.Hosting.WindowsServices 10.0.13, xunit.v3.mtp-v2 4.0.2, FluentAssertions [7.2.0], BenchmarkDotNet 0.15.8.
 
 ## 3. Just finished
+
+**2026-10-21 (h), S6 QA: P1.02 re-run after 61f0577 → REJECTED**
+- Inno 6.7.3 help decompiled into the S6 scratchpad (8.3 path); all four quotations in §19.3/§21 confirmed verbatim (ExecAsOriginalUser not supported at uninstall; `Exec` uses Setup/Uninstall credentials; *Non Administrative Install Mode* "user-level files … handled by the application itself"; `IsAdminInstallMode` True when Uninstall runs with admin privileges). HKCU `{AppId}_is1` discriminator matches Inno key naming. §22 E3, P4.43, P7.14 consistent on the main flow.
+- Defects (S1): (1) ARCHITECTURE §13.2 GPU row: packs "deleted by the uninstaller's remove user data option"; (2) P6.30 acceptance "uninstall with remove-data → folder gone"; (3) P7.08 title "uninstall data prompt incl. `runtimes\`"; (4) §19.3 says any elevated uninstall (`IsAdminInstallMode` True) never purges, while P7.14 (3) adds "and key not in HKCU" and P4.43 (d) expects elevated same-account per-user uninstalls to purge — pick one rule (recommend the HKCU key check) and add the P7.14 case.
+- No code changed; only TODO/STATE/HANDOFF staged. `.worktrees\` untouched.
+
 
 **2026-10-21 (g), S1: P1.02 rework — uninstall-time user-data removal**
 - **Research.** I decompiled the installed Inno Setup 6.7.3 help (`ISetup.chm`) into the S1 scratchpad (via its 8.3 short path, because `hh.exe` fails on long paths) and checked the APIs. The copy was deleted afterwards.
@@ -84,6 +90,8 @@ TODO totals: 183 items: 9 VERIFIED_COMPLETE, 5 READY_FOR_QA, the rest PENDING.
 
 ## 4. Active work
 
+> S6 (2026-10-21 h): next for S1 — fix the 4 P1.02 consistency defects listed in TODO.md P1.02 / §3 above, set `[READY_FOR_QA]`, S6 re-runs (doc-only check).
+
 | Item | Owner | Status | Notes |
 |---|---|---|---|
 | P1.02 uninstall user-data mechanism | S6 | waiting (S1 → `[READY_FOR_QA]`) | Re-run: §19.3, the §21 "P1.02 rework" row, P4.43, P7.14 |
@@ -126,6 +134,9 @@ Select-String -Path docs\handoff\ARCHITECTURE.md -Pattern 'ExecAsOriginalUser'  
 ```
 
 ## 7. Session log
+
+### 2026-10-21 (h) — Subagent 6 (QA)
+- Re-verified P1.02 after S1 commit 61f0577 against the locally installed Inno 6.7.3 help (decompiled in the S6 scratchpad). Mechanism correct; rejected for 4 doc/acceptance inconsistencies (TODO.md P1.02). Worked only in the main checkout; staged only docs.
 
 ### 2026-10-21 (g) — Subagent 1 (Lead Architect & State Scribe)
 - Reworked the P1.02 uninstall user-data mechanism after S6's rejection, verifying every Inno API against the installed 6.7.3 help.

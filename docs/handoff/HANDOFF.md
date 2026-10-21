@@ -1,23 +1,23 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-21 (g) by Subagent 1: P1.02 uninstall user-data mechanism reworked (app-owned per-user removal + per-user-install-only uninstaller purge via `Exec`) → `[READY_FOR_QA]`.
+> Last update: 2026-10-21 (h) by Subagent 6 (QA): P1.02 re-run after 61f0577 → rejected (4 consistency defects; mechanism itself verified).
 
 ## 1. Executive summary
 
 NexPane is a production-grade, AI-powered Windows file explorer: C# / **.NET 10 LTS** / **WPF**, x64, unpackaged, Windows 10 1809+ and Windows 11, Inno Setup 6 installer, **proprietary license, shipped unsigned**.
 
-Phase 1 is complete up to QA. The toolchain is installed. The git repository (`main`) and `NexPane.sln` exist, with 15 `src` projects layered per ARCHITECTURE §4, 16 xUnit v3 test projects and a benchmarks runner. The solution builds with 0 warnings and 0 errors, and 108 of 108 tests pass with the default filter. The app opens an empty window titled "NexPane". The IndexService is a Windows-service host skeleton that starts and stops cleanly. No feature code exists yet.
+Phase 1 is complete except P1.02 (doc consistency fixes pending). The toolchain is installed. The git repository (`main`) and `NexPane.sln` exist, with 15 `src` projects layered per ARCHITECTURE §4, 16 xUnit v3 test projects and a benchmarks runner. The solution builds with 0 warnings and 0 errors, and 108 of 108 tests pass with the default filter. The app opens an empty window titled "NexPane". The IndexService is a Windows-service host skeleton that starts and stops cleanly. No feature code exists yet.
 
 The build → test → publish → installer pipeline (P1.11) is scripted in `eng\` and verified end-to-end. The placeholder scanner (P1.12) is in place and runs inside the default test suite (default suite now 108 tests, incl. QA's `GitIgnoreTests`).
 
 **Phase 1 status:**
 - `[VERIFIED_COMPLETE]` (S6, 2026-10-21): P1.01, P1.03–P1.14 except P1.02 — 13 of 14.
-- `[READY_FOR_QA]`: **P1.02**. The uninstall user-data design no longer uses `ExecAsOriginalUser`.
+- `[IN_PROGRESS]`: **P1.02** (S6 reject after 61f0577). The uninstall user-data design below is verified against the Inno 6.7.3 help, but four places still contradict it: ARCHITECTURE §13.2 GPU row and TODO P6.30/P7.08 promise uninstaller removal in admin mode, and §19.3 vs P7.14/P4.43 disagree on whether an elevated per-user uninstall purges. Details in TODO.md P1.02.
   - Per-user data is removed by the app, per user (Settings › Privacy › "Remove my NexPane data…" / `--purge-user-data`, P4.43).
   - The uninstaller purges only for per-user installs, via plain `Exec`, on an explicit Yes.
   - Admin-mode uninstalls keep per-user data and tell the user how to remove it.
-  - See ARCHITECTURE §19.3 and §21 "P1.02 rework". Waiting for the S6 re-run.
+  - See ARCHITECTURE §19.3 and §21 "P1.02 rework".
 
 Phase 2 (S7, branding) and Phase 3 (S2, core systems, in its own worktree `.worktrees\phase3` on branch `phase3-core-search`) run in parallel. Do not edit that worktree from `main`.
 
@@ -34,7 +34,7 @@ Phase 2 (S7, branding) and Phase 3 (S2, core systems, in its own worktree `.work
 | `eng/common.ps1`, `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss` | Complete, `[READY_FOR_QA]` (P1.11); pipeline verified end-to-end → `dist\NexPane-Setup.exe` (52.8 MB). The `.iss` still needs the WebView2 bootstrapper and real branding in P7.08 |
 | `eng/check-placeholders.ps1`, `eng/placeholder-allowlist.json`, `tests/NexPane.Architecture.Tests/PlaceholderScannerTests.cs` | `[VERIFIED_COMPLETE]` (P1.12). QA owns the allowlist |
 | `.gitignore`, `THIRD-PARTY-NOTICES.txt`, ARCHITECTURE §22 / P1.14 sections | `[VERIFIED_COMPLETE]` (P1.07, P1.13, P1.08, P1.14). `.gitignore` is guarded by `tests/NexPane.Architecture.Tests/GitIgnoreTests.cs` |
-| `ARCHITECTURE.md` §19.3 + §21 (uninstall user-data handling), TODO P4.43 / P7.14 | `[READY_FOR_QA]` (P1.02 rework by S1, 2026-10-21 g) |
+| `ARCHITECTURE.md` §19.3 + §21 (uninstall user-data handling), §13.2 GPU row, TODO P4.43 / P6.30 / P7.08 / P7.14 | `[IN_PROGRESS]` — P1.02 rework verified by S6 except 4 consistency defects (TODO.md P1.02) |
 | `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss`, `eng/placeholder-allowlist.json` | Cross-references reworded to "task(s) P1.11"; the allowlist is empty; scanner exit 0 |
 | Next up | S1: fix P1.02 (purge mechanism) → S6 re-run. In parallel: S7 Phase 2 (P2.01, P2.02), S2 Phase 3 (P3.01, P3.03) |
 
