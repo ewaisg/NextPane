@@ -12,8 +12,8 @@ NexPane is a production-grade, AI-powered Windows file explorer: C# / **.NET 10 
 The build → test → publish → installer pipeline (P1.11) is scripted in `eng\` and verified end-to-end. The placeholder scanner (P1.12) is in place and runs inside the default test suite (default suite now 108 tests, incl. QA's `GitIgnoreTests`).
 
 **Phase 1 status:**
-- `[VERIFIED_COMPLETE]` (S6, 2026-10-21): P1.01, P1.03–P1.14 except P1.02 — 13 of 14.
-- `[READY_FOR_QA]`: **P1.02**. S6's 4 consistency defects are fixed (§13.2 GPU row, P6.30, P7.08, and one rule across §19.3, §21, P4.43 and P7.14). The uninstall user-data design (verified against the Inno 6.7.3 help):
+- `[VERIFIED_COMPLETE]` (S6, 2026-10-21): **all of P1.01–P1.14** — Phase 1 complete.
+- P1.02 verified by S6 after 5f64ea8; the 4 consistency defects were fixed (§13.2 GPU row, P6.30, P7.08, and one rule across §19.3, §21, P4.43 and P7.14). The uninstall user-data design (verified against the Inno 6.7.3 help):
   - Per-user data is removed by the app, per user (Settings › Privacy › "Remove my NexPane data…" / `--purge-user-data`, P4.43).
   - **One rule for the uninstaller:** the purge is offered **if and only if** the uninstall key `…\Uninstall\{AppId}_is1` exists under the running account's **HKCU** (a per-user install owned by that account, elevated or not). It runs on an explicit Yes via plain `Exec`, never when silent. `IsAdminInstallMode` is not consulted.
   - Otherwise (admin-mode install, or another account) the uninstaller keeps per-user data and tells the user how to remove it.
