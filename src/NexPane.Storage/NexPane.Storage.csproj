@@ -5,7 +5,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="NexPane.Storage.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Migrations\Index\*.sql" LogicalName="NexPane.Storage.Migrations.Index.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Migrations\App\*.sql" LogicalName="NexPane.Storage.Migrations.App.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\NexPane.Core\NexPane.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
   </ItemGroup>
 
 </Project>
