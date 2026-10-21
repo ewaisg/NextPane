@@ -1,25 +1,25 @@
 # NexPane — Current State
 
 > Updated by every subagent at the end of every session. Newest entry is at the top of the Session Log.
-> Last update: **2026-10-21 (e)** by **Subagent 1 (Lead Architect & State Scribe)**: fixes for the QA rejections of P1.02/P1.07/P1.08/P1.13, the P1.14 decision, and the roster renumbering.
+> Last update: **2026-10-21 (f)** by **Subagent 6 (QA, Verification & Security Inspector)**: re-verification after S1 commit 180b0c0.
 > Roster (user-mandated numbering): S1 Architect & State Scribe · S2 Core Systems & Indexing Engine · S3 Native Windows Shell & OS Integration · S4 AI & Semantic Pipeline · S5 UI/UX & Workspace · **S6 QA, Verification & Security Inspector (veto)** · S7 Release & Installer Packaging (incl. icons/assets). Older log entries below that say "S7 QA role" refer to the QA role, which is now **S6**.
 
 ## 1. Snapshot
 
 | Item | Value |
 |---|---|
-| Current phase | **Phase 1 — awaiting QA re-run.** 9 `[VERIFIED_COMPLETE]` (P1.01, P1.03–P1.06, P1.09–P1.12); 5 `[READY_FOR_QA]` (P1.02, P1.07, P1.08, P1.13, P1.14) — fixes and evidence are inline in TODO.md |
+| Current phase | **Phase 1 — NOT complete: 13/14 `[VERIFIED_COMPLETE]`.** P1.02 rejected again → `[IN_PROGRESS]` (S1): the uninstall-time purge in §19.3/§21 relies on Inno `ExecAsOriginalUser`, which Inno does not support at uninstall time. Phase 2 (S7) and Phase 3 (S2) may start now |
 | Placeholder scanner (P1.12) | `eng\check-placeholders.ps1` → **26 files, 0 violations, 0 allowlisted, 0 stale, exit 0**. The four `TODO P1.11` cross-references now read "task(s) P1.11"; `eng\placeholder-allowlist.json` has `"entries": []` |
 | Toolchain | .NET SDK 10.0.402, Git 2.55.0, Inno Setup 6.7.3 (per-user: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) |
 | Pipeline (P1.11) | `eng\build.ps1` → `eng\publish.ps1` → `eng\installer.ps1 -AllowMissingBranding` → unversioned `dist\NexPane-Setup.exe` (55.35 MB, ProductVersion 0.1.0; never executed) |
 | Git | Repo on `main`, no remote. Recent commits: `c6b4d4f` scaffold, `0fe2b0a` decisions, `92abcb9` P1.11, `6e4bdbb` unversioned installer, `22fb2ba` QA audit, then the S1 QA-fix commit (see `git log -1`). Identity: `NexPane Dev <ewaisg@gmail.com>` |
 | Solution | `NexPane.sln`: 15 `src` projects, 16 test projects, 1 benchmark runner |
 | Build | `dotnet build NexPane.sln -c Release` → **Build succeeded. 0 Warning(s) 0 Error(s)** |
-| Tests | Default filter → **total: 80, failed: 0, succeeded: 80, skipped: 0** |
+| Tests | Default filter → **total: 108, failed: 0, succeeded: 108** (QA added 28 `GitIgnoreTests`) |
 | App | `NexPane.exe` opens a 1280×800 window titled "NexPane" and exits 0 on `CloseMainWindow` |
 | Feature code | None yet |
 | User decisions | D1–D5 (ARCHITECTURE §20) + P1.14 (§21): network credentials in the Windows Credential Locker; AI keys via DPAPI/Credential Manager |
-| Blockers | None. The P1.07 `.gitignore` blocker is fixed (READY_FOR_QA) |
+| Blockers | None for Phase 2/3. P1.02 open (uninstall purge mechanism; affects P4.43/P7.14 only) |
 
 ## 2. What exists on disk (tracked)
 
@@ -38,6 +38,19 @@ C:\Users\Ewais\Projects\NexPane\
 Package pins: Microsoft.Extensions.Hosting.WindowsServices 10.0.13, xunit.v3.mtp-v2 4.0.2, FluentAssertions [7.2.0], BenchmarkDotNet 0.15.8.
 
 ## 3. Just finished
+
+**2026-10-21 (f), S6 QA: re-verification of S1 commit 180b0c0**
+
+| Item | Verdict | Evidence |
+|---|---|---|
+| P1.07 | VERIFIED | `git check-ignore -q`: 18 source/asset/fixture probes exit 1, 16 output/secret probes exit 0; `git ls-files -ci --exclude-standard` empty; new `GitIgnoreTests` (28) pass, and re-adding `models/` fails 3 of them (reverted) |
+| P1.08 | VERIFIED | Every product requirement maps to a §22 row with existing TODO ids |
+| P1.13 | VERIFIED | All §15 names + 4/4 PackageVersions present in notices; ASCII |
+| P1.14 | VERIFIED | §21 decision; consistent terms in §2/§3/§9.2/§10.3/§12.6/§16/§18/§22; P5.31/P6.01 use PasswordVault |
+| P1.02 | **REJECTED** | Other fixes OK (SQL re-run with FTS5 OK; Mermaid balanced, no stray `;`). Defect: §19.3 + §21 run `--purge-user-data` from the uninstaller via `ExecAsOriginalUser`; Inno 6.7.3 help (`ISetup.chm` › ExecAsOriginalUser › Remarks): "This function is not supported at uninstall time." P4.43/P7.14 acceptance inherit it |
+| Roster | OK | Every owner tag in TODO.md matches the user roles (S2 engines/indexing/archives/sync/network, S3 native shell/OS/credential stores, S4 AI, S5 UI, S6 QA, S7 release/assets) |
+| Build/test/scan | OK | `eng\build.ps1` exit 0: 0 warnings, 0 errors, 108/108; `check-placeholders.ps1` 26 files, 0 violations, 0 allowlisted, exit 0 |
+
 
 **2026-10-21 (e), S1: QA rejection fixes, P1.14, roster renumbering**
 
@@ -58,7 +71,7 @@ TODO totals: 183 items: 9 VERIFIED_COMPLETE, 5 READY_FOR_QA, the rest PENDING.
 
 | Item | Owner | Status | Notes |
 |---|---|---|---|
-| QA re-run of P1.02, P1.07, P1.08, P1.13, P1.14 | S6 | waiting | QA also planned a `git check-ignore` regression test in Architecture.Tests once P1.07 lands |
+| P1.02 uninstall purge mechanism | S1 | `[IN_PROGRESS]` (QA reject) | Replace `ExecAsOriginalUser` (unsupported at uninstall) with a supported mechanism, record in §21, update P4.43/P7.14 acceptance; then S6 re-runs |
 | Phase 2 (branding/assets) | **S7** | `[PENDING]` | Start with P2.01 (logo SVGs), then P2.02 (`tools\NexPane.AssetGen`) |
 | Phase 3 (core FS, indexer, search) | **S2** | `[PENDING]` | Start with P3.01 (VfsPath) and P3.03 (Storage migrations). Can run in parallel with Phase 2 now that `.gitignore` is safe |
 
@@ -97,6 +110,12 @@ git check-ignore src/NexPane.Core/Models/VfsEntry.cs src/NexPane.Security/Secret
 ```
 
 ## 7. Session log
+
+### 2026-10-21 (f) — Subagent 6 (QA, Verification & Security Inspector)
+- Re-ran P1.02, P1.07, P1.08, P1.13, P1.14 independently after 180b0c0; verdicts in §3. Checked the roster remap in TODO.md.
+- Added `tests/NexPane.Architecture.Tests/GitIgnoreTests.cs` (28 cases; proven to fail on a re-added `models/` line).
+- Found the `ExecAsOriginalUser` uninstall limitation by decompiling the locally installed Inno help (`hh.exe -decompile` into `C:\npqa_chm`; that folder could not be deleted by the agent because of a path guard — safe to delete manually).
+- Build 0/0, tests 108/108, placeholder scan exit 0.
 
 ### 2026-10-21 (e) — Subagent 1 (Lead Architect & State Scribe)
 - Applied the user-mandated roster numbering (by role) across TODO, ARCHITECTURE, HANDOFF and STATE.

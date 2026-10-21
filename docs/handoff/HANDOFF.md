@@ -1,24 +1,20 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-21 (e) by Subagent 1 (Lead Architect & State Scribe): QA-rejection fixes (P1.02, P1.07, P1.08, P1.13), P1.14 credential-store decision, roster renumbered to the user-mandated numbering (§8).
+> Last update: 2026-10-21 (f) by Subagent 6 (QA): re-verification after S1 commit 180b0c0 — 13/14 Phase 1 items verified; P1.02 rejected (uninstall purge mechanism).
 
 ## 1. Executive summary
 
 NexPane is a production-grade, AI-powered Windows file explorer: C# / **.NET 10 LTS** / **WPF**, x64, unpackaged, Windows 10 1809+ and Windows 11, Inno Setup 6 installer, **proprietary license, shipped unsigned**.
 
-Phase 1 is complete up to QA. The toolchain is installed. The git repository (`main`) and `NexPane.sln` exist, with 15 `src` projects layered per ARCHITECTURE §4, 16 xUnit v3 test projects and a benchmarks runner. The solution builds with 0 warnings and 0 errors, and 80 of 80 tests pass with the default filter. The app opens an empty window titled "NexPane". The IndexService is a Windows-service host skeleton that starts and stops cleanly. No feature code exists yet.
+Phase 1 is complete up to QA. The toolchain is installed. The git repository (`main`) and `NexPane.sln` exist, with 15 `src` projects layered per ARCHITECTURE §4, 16 xUnit v3 test projects and a benchmarks runner. The solution builds with 0 warnings and 0 errors, and 108 of 108 tests pass with the default filter. The app opens an empty window titled "NexPane". The IndexService is a Windows-service host skeleton that starts and stops cleanly. No feature code exists yet.
 
-The build → test → publish → installer pipeline (P1.11) is scripted in `eng\` and verified end-to-end. The placeholder scanner (P1.12) is in place and runs inside the default test suite (now 80 tests).
+The build → test → publish → installer pipeline (P1.11) is scripted in `eng\` and verified end-to-end. The placeholder scanner (P1.12) is in place and runs inside the default test suite (default suite now 108 tests, incl. QA's `GitIgnoreTests`).
 
 **Phase 1 status:**
-- `[VERIFIED_COMPLETE]`: P1.01, P1.03–P1.06, P1.09–P1.12.
-- `[READY_FOR_QA]` after S1's fixes, waiting for S6 to re-run:
-  - P1.02 (ARCHITECTURE defects; all 6 Mermaid blocks render);
-  - P1.07 (`.gitignore` anchored);
-  - P1.08 (full §22 traceability);
-  - P1.13 (notices);
-  - P1.14 (Credential Locker decision).
+- `[VERIFIED_COMPLETE]` (S6, 2026-10-21): P1.01, P1.03–P1.14 except P1.02 — 13 of 14.
+- `[IN_PROGRESS]`: **P1.02** — §19.3/§21 have the uninstaller run `NexPane.exe --purge-user-data` via Inno `ExecAsOriginalUser`, which Inno does not support at uninstall time (Inno help, ExecAsOriginalUser › Remarks). S1 must choose a supported mechanism and update P4.43/P7.14.
+- Phase 1 is therefore not formally complete, but the open defect only affects uninstall design (Phase 4/7).
 
 Phase 2 (S7, branding) and Phase 3 (S2, core systems) can start in parallel now.
 
@@ -34,9 +30,10 @@ Phase 2 (S7, branding) and Phase 3 (S2, core systems) can start in parallel now.
 | `tests/Shared/ModuleAssembly.cs` | Shared helper linked into every `*Tests` project (x64 / target framework assertions) |
 | `eng/common.ps1`, `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss` | Complete, `[READY_FOR_QA]` (P1.11); pipeline verified end-to-end → `dist\NexPane-Setup.exe` (52.8 MB). The `.iss` still needs the WebView2 bootstrapper and real branding in P7.08 |
 | `eng/check-placeholders.ps1`, `eng/placeholder-allowlist.json`, `tests/NexPane.Architecture.Tests/PlaceholderScannerTests.cs` | `[VERIFIED_COMPLETE]` (P1.12). QA owns the allowlist |
-| `.gitignore`, `ARCHITECTURE.md` (header, §2, §3, §9.2, §10.3, §12.6, §14, §16, §18, §19.3, §20 R7/R17, §21, §22), `THIRD-PARTY-NOTICES.txt` | `[READY_FOR_QA]`: P1.07, P1.02, P1.08, P1.13 and P1.14 fixes by S1 (2026-10-21 e) |
+| `.gitignore`, `THIRD-PARTY-NOTICES.txt`, ARCHITECTURE §22 / P1.14 sections | `[VERIFIED_COMPLETE]` (P1.07, P1.13, P1.08, P1.14). `.gitignore` is guarded by `tests/NexPane.Architecture.Tests/GitIgnoreTests.cs` |
+| `ARCHITECTURE.md` §19.3 + §21 (uninstall user-data purge) | `[IN_PROGRESS]` — P1.02 QA reject: `ExecAsOriginalUser` is unsupported at uninstall time |
 | `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss`, `eng/placeholder-allowlist.json` | Cross-references reworded to "task(s) P1.11"; the allowlist is empty; scanner exit 0 |
-| Next up | S6: re-run the five READY_FOR_QA items. S7: Phase 2 (P2.01, P2.02). S2: Phase 3 (P3.01, P3.03) |
+| Next up | S1: fix P1.02 (purge mechanism) → S6 re-run. In parallel: S7 Phase 2 (P2.01, P2.02), S2 Phase 3 (P3.01, P3.03) |
 
 ## 3. Environment setup
 
@@ -152,6 +149,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
 20. **GPU Whisper** runtimes (CUDA and Vulkan) are optional downloads into `%LOCALAPPDATA%\NexPane\runtimes\`. They are never bundled in the installer, and loading must always fall back to CPU without crashing (ARCHITECTURE §13.2).
 21. **Inno Setup 6.7.3** is installed. ISPP `RemoveBackslash` is deprecated (it causes a warning, which fails `eng/installer.ps1`), so use `RemoveBackslashUnlessRoot`. Language-specific custom messages use a dot (`english.Name=`), not a colon. ISCC writes compile errors to stderr. Index Service setup lives in the `.iss` `[Code]` section (ARCHITECTURE §21), not in `[Run]`.
 22. **`.gitignore` rule (P1.07 fix):** the repo has `core.ignorecase=true`, so every directory pattern must be anchored (`/models/`) or scoped to a project folder (`/src/*/[Bb]in/`). Never add an unanchored folder pattern. `tests/TestAssets/**` is always re-included. Check new patterns with `git check-ignore -v <path>` and `git status --ignored`. With `-v`, a negation match (`!…`) also exits 0, so use `git check-ignore -q` (exit 1 = not ignored) to test. Long scratch paths (> 260 chars, e.g. the agent scratchpad) make `dotnet` fail with "The directory name is invalid"; use a short `%TEMP%\...` folder for throwaway projects.
+23. **Inno uninstaller limits (QA, P1.02):** `ExecAsOriginalUser`/`ShellExecAsOriginalUser` and the `runasoriginaluser` flag are **not supported at uninstall time** (Inno help, ExecAsOriginalUser › Remarks); the elevated uninstaller's `{localappdata}`/`{userappdata}` may be the admin's profile. Inno Pascal cannot call WinRT (`PasswordVault`). Design per-user cleanup around these limits. `.gitignore` regressions are caught by `GitIgnoreTests`.
 
 ## 7. Working rules
 
