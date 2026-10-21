@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- NexPane logo: app mark above the wordmark. Copyright (c) 2026 NexPane. All rights reserved.
+     The nested <svg id="mark"> and <svg id="wordmark"> elements are extracted by tools/NexPane.AssetGen
+     (detailed mark for icon sizes of 40 px and up; wordmark for the installer bitmaps). The wordmark is
+     constructed from geometric paths; no font is referenced. -->
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>NexPane</title>
+  <defs>
+    <linearGradient id="np-tile-gradient" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1FB6FF"/>
+      <stop offset="1" stop-color="#4338F5"/>
+    </linearGradient>
+    <linearGradient id="np-tile-sheen" x1="0" y1="8" x2="0" y2="248" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <svg id="mark" x="272" y="160" width="480" height="480" viewBox="0 0 256 256">
+    <rect id="tile" x="8" y="8" width="240" height="240" rx="56" ry="56" fill="url(#np-tile-gradient)"/>
+    <rect x="8" y="8" width="240" height="240" rx="56" ry="56" fill="url(#np-tile-sheen)"/>
+    <g id="glyph" fill="#FFFFFF">
+      <polygon points="60,88 100,88 196,176 156,176" fill-opacity="0.78"/>
+      <rect x="56" y="88" width="44" height="120" rx="7" ry="7"/>
+      <rect x="156" y="56" width="44" height="120" rx="7" ry="7"/>
+    </g>
+    <path id="spark" fill="#FFC24B" d="M78,26 Q78,50 102,50 Q78,50 78,74 Q78,50 54,50 Q78,50 78,26 Z"/>
+  </svg>
+  <svg id="wordmark" x="112" y="712" width="800" height="145.19" viewBox="0 0 551 100">
+    <g fill="#4D74FF" stroke="#4D74FF">
+      <!-- N -->
+      <g stroke="none">
+        <rect x="0" y="0" width="14" height="100"/>
+        <rect x="58" y="0" width="14" height="100"/>
+        <polygon points="0,0 18,0 72,100 54,100"/>
+      </g>
+      <!-- e -->
+      <path d="M147,65 A28,28 0 1 0 140.45,83" fill="none" stroke-width="14"/>
+      <rect x="84" y="58" width="70" height="14" stroke="none"/>
+      <!-- x -->
+      <g stroke="none">
+        <polygon points="164,30 183,30 228,100 209,100"/>
+        <polygon points="209,30 228,30 183,100 164,100"/>
+      </g>
+      <!-- P -->
+      <rect x="244" y="0" width="14" height="100" stroke="none"/>
+      <path d="M251,7 H284 A26,26 0 0 1 284,59 H251" fill="none" stroke-width="14"/>
+      <!-- a -->
+      <circle cx="360" cy="65" r="28" fill="none" stroke-width="14"/>
+      <rect x="381" y="30" width="14" height="70" stroke="none"/>
+      <!-- n -->
+      <rect x="407" y="30" width="14" height="70" stroke="none"/>
+      <path d="M414,58 A24,24 0 0 1 462,58" fill="none" stroke-width="14"/>
+      <rect x="455" y="58" width="14" height="42" stroke="none"/>
+      <!-- e -->
+      <path d="M544,65 A28,28 0 1 0 537.45,83" fill="none" stroke-width="14"/>
+      <rect x="481" y="58" width="70" height="14" stroke="none"/>
+    </g>
+  </svg>
+</svg>

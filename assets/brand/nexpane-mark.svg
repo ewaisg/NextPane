@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- NexPane app mark, simplified small-size variant (16-32 px). Copyright (c) 2026 NexPane. All rights reserved.
+     Drawn on a 16-unit grid (1 px at 16x16 = 16 units) so the stems land on whole pixels. -->
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="256" height="256" viewBox="0 0 256 256">
+  <title>NexPane</title>
+  <defs>
+    <linearGradient id="np-tile-gradient" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1FB6FF"/>
+      <stop offset="1" stop-color="#4338F5"/>
+    </linearGradient>
+  </defs>
+  <rect id="tile" x="0" y="0" width="256" height="256" rx="56" ry="56" fill="url(#np-tile-gradient)"/>
+  <g id="glyph" fill="#FFFFFF">
+    <polygon points="48,80 96,80 208,176 160,176"/>
+    <rect x="48" y="80" width="48" height="128"/>
+    <rect x="160" y="48" width="48" height="128"/>
+  </g>
+  <path id="spark" fill="#FFC24B" d="M72,16 Q72,40 96,40 Q72,40 72,64 Q72,40 48,40 Q72,40 72,16 Z"/>
+</svg>
