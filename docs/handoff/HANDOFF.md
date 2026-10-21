@@ -1,7 +1,7 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-21 (j) by Subagent 6 (QA): P1.02 verified after 5f64ea8 — Phase 1 complete (14/14).
+> Last update: 2026-10-21 (k) by the orchestrator: merged `phase2-branding` into `main`. Phase 1 complete (14/14) and Phase 2 complete (P2.01–P2.09 `[VERIFIED_COMPLETE]`).
 
 ## 1. Executive summary
 
@@ -19,7 +19,9 @@ The build → test → publish → installer pipeline (P1.11) is scripted in `en
   - Otherwise (admin-mode install, or another account) the uninstaller keeps per-user data and tells the user how to remove it.
   - See ARCHITECTURE §19.3 and §21 "P1.02 rework".
 
-Phase 2 (S7, branding) and Phase 3 (S2, core systems, in its own worktree `.worktrees\phase3` on branch `phase3-core-search`) run in parallel. Do not edit that worktree from `main`.
+**Phase 2 (branding) is verified (S6, 2026-10-21):** generated assets in `assets/`, `tools/NexPane.AssetGen` (re-run: `dotnet run -c Release --project tools/NexPane.AssetGen -- --svg assets/brand/nexpane-logo.svg --mark assets/brand/nexpane-mark.svg --out assets`; output must stay byte-identical, enforced by `AssetGenDeterminismTests`), exe/window/setup icons, tray icon interop and theme tokens. Release installers now compile without `-AllowMissingBranding`. In the notification area use `tray-light.ico`/`tray-dark.ico` (via `TrayIcon.VariantForCurrentTaskbar()`), not the full-colour `tray.ico`.
+
+Phase 2 is merged into `main`. Phase 3 (S2, core systems) runs in its own worktree `.worktrees\phase3` on branch `phase3-core-search`. Do not edit that worktree from `main`.
 
 ## 2. Files currently being worked on
 
@@ -36,7 +38,8 @@ Phase 2 (S7, branding) and Phase 3 (S2, core systems, in its own worktree `.work
 | `.gitignore`, `THIRD-PARTY-NOTICES.txt`, ARCHITECTURE §22 / P1.14 sections | `[VERIFIED_COMPLETE]` (P1.07, P1.13, P1.08, P1.14). `.gitignore` is guarded by `tests/NexPane.Architecture.Tests/GitIgnoreTests.cs` |
 | `ARCHITECTURE.md` §19.3 + §21 (uninstall user-data handling), §13.2 GPU row, TODO P4.43 / P6.30 / P7.08 / P7.14 | `[VERIFIED_COMPLETE]` (P1.02, S6 2026-10-21 after 5f64ea8); implementation work is P4.43 (S3) and P7.14 (S7) |
 | `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss`, `eng/placeholder-allowlist.json` | Cross-references reworded to "task(s) P1.11"; the allowlist is empty; scanner exit 0 |
-| Next up | Phase 1 closed. S7 Phase 2 (`.worktrees\phase2`), S2 Phase 3 (`.worktrees\phase3`); S6 verifies each `[READY_FOR_QA]` item (P2.09, P3.36 gates) |
+| `assets/brand/*.svg`, `assets/icons/*`, `assets/installer/*`, `tools/NexPane.AssetGen`, `tests/NexPane.AssetGen.Tests`, `src/NexPane.App/Themes/Tokens.xaml`, `src/NexPane.Shell/Tray/*` | `[VERIFIED_COMPLETE]` (Phase 2, S7; gate P2.09 by S6), merged into `main`; the installer now compiles **with** branding |
+| Next up | Phases 1–2 closed. S2 Phase 3 in `.worktrees\phase3` (branch `phase3-core-search`); S6 runs gate P3.36 there, then the orchestrator merges into `main` |
 
 ## 3. Environment setup
 
@@ -73,7 +76,7 @@ Initialization is done (commit `c6b4d4f`). The repo was scaffolded by hand rathe
 3. Classify every new `src` project in `tests/NexPane.Architecture.Tests/LayeringRules.cs` and in ARCHITECTURE §3/§4. Unclassified projects fail `Every_layer_project_exists_under_src`.
 4. Test projects must be named `*Tests`. `tests/Directory.Build.props` then makes them xUnit v3 MTP executables with FluentAssertions and the shared helper. Each test project must contain at least one test, because Microsoft.Testing.Platform fails an assembly with zero tests (exit code 8).
 5. Add the project to the solution: `dotnet sln NexPane.sln add <csproj> --solution-folder src|tests|tools`.
-6. `tools/NexPane.AssetGen` does not exist yet; S7 (Release & Installer Packaging, which owns branding) creates it in P2.02.
+6. `tools/NexPane.AssetGen` (P2.02) is the branding generator. It references no `src` project. After editing `assets/brand/*.svg`, re-run it and commit the regenerated `assets/` files; `AssetGenDeterminismTests.Committed_assets_match_a_fresh_generation` fails on stale assets. Add `--preview <png>` for an enlarged light/dark review sheet.
 
 ## 5. Build, test, publish, installer commands
 
@@ -159,6 +162,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
       - the **only** discriminator is the `{AppId}_is1` uninstall key under the running account's HKCU (not `IsAdminInstallMode`); without it the uninstaller never deletes `{localappdata}`/`{userappdata}` content.
     - Verify any Inno API against the local help. `hh.exe -decompile` fails on paths over MAX_PATH, so decompile into a scratch folder using its 8.3 short path.
     - `.gitignore` regressions are caught by `GitIgnoreTests`.
+24. **Icons (Phase 2).**
+    - `System.Drawing.Icon(path, size)` ignores PNG-compressed .ico entries when it picks a frame (it returns 128 for a request of 256). Use Win32 `LoadImage`/`ExtractIconEx`, or decode the PNG frame directly.
+    - AssetGen output is byte-identical between runs on the same machine. Skia's raster code may differ across CPU feature sets, so if the committed-assets test fails on another machine, regenerate there and compare the result visually before committing.
+    - In PowerShell, use absolute paths with `[IO.File]` calls: .NET resolves relative paths against the process working directory, which can be the main checkout rather than the worktree.
 
 ## 7. Working rules
 

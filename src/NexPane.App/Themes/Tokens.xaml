@@ -1,0 +1,38 @@
+<!--
+  NexPane theme colour tokens derived from the logo (task P2.08, ARCHITECTURE "Themes").
+  Brand colours come from assets/brand/*.svg; the Dark and Light sets are the palette values that the
+  Phase 4 theme dictionaries (Dark.xaml / Light.xaml) map onto the semantic Brush.* keys.
+  Contrast (WCAG 2.x), checked by tests/NexPane.UITests/ThemeTokenContrastTests:
+    Text and TextSecondary on Surface and SurfaceAlt >= 4.5:1; Accent on Surface and SurfaceAlt >= 3:1;
+    AccentForeground on Accent >= 4.5:1.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Brand (logo) -->
+  <Color x:Key="Color.Brand.Sky">#FF1FB6FF</Color>
+  <Color x:Key="Color.Brand.Indigo">#FF4338F5</Color>
+  <Color x:Key="Color.Brand.Spark">#FFFFC24B</Color>
+  <Color x:Key="Color.Brand.Wordmark">#FF4D74FF</Color>
+
+  <!-- Dark theme -->
+  <Color x:Key="Color.Dark.Surface">#FF14161F</Color>
+  <Color x:Key="Color.Dark.SurfaceAlt">#FF1D202C</Color>
+  <Color x:Key="Color.Dark.Border">#FF2E3242</Color>
+  <Color x:Key="Color.Dark.Text">#FFECEEF5</Color>
+  <Color x:Key="Color.Dark.TextSecondary">#FFA3A9BD</Color>
+  <Color x:Key="Color.Dark.Accent">#FF5B8CFF</Color>
+  <Color x:Key="Color.Dark.AccentForeground">#FF0B0D14</Color>
+  <Color x:Key="Color.Dark.Highlight">#FFFFC24B</Color>
+
+  <!-- Light theme -->
+  <Color x:Key="Color.Light.Surface">#FFFFFFFF</Color>
+  <Color x:Key="Color.Light.SurfaceAlt">#FFF3F5FA</Color>
+  <Color x:Key="Color.Light.Border">#FFD9DDE8</Color>
+  <Color x:Key="Color.Light.Text">#FF141726</Color>
+  <Color x:Key="Color.Light.TextSecondary">#FF555C72</Color>
+  <Color x:Key="Color.Light.Accent">#FF3D5BF0</Color>
+  <Color x:Key="Color.Light.AccentForeground">#FFFFFFFF</Color>
+  <Color x:Key="Color.Light.Highlight">#FFB7790A</Color>
+
+</ResourceDictionary>

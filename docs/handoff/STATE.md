@@ -1,25 +1,25 @@
 # NexPane — Current State
 
 > Updated by every subagent at the end of every session. Newest entry is at the top of the Session Log.
-> Last update: **2026-10-21 (j)** by **Subagent 6 (QA, Verification & Security Inspector)**: P1.02 verified after 5f64ea8 — **Phase 1 complete (14/14)**.
+> Last update: **2026-10-21 (k)** by **the orchestrator**: merged `phase2-branding` into `main` — **Phase 1 complete (14/14), Phase 2 complete (P2.01–P2.09)**.
 > Roster (user-mandated numbering): S1 Architect & State Scribe · S2 Core Systems & Indexing Engine · S3 Native Windows Shell & OS Integration · S4 AI & Semantic Pipeline · S5 UI/UX & Workspace · **S6 QA, Verification & Security Inspector (veto)** · S7 Release & Installer Packaging (incl. icons/assets). Older log entries below that say "S7 QA role" refer to the QA role, which is now **S6**.
 
 ## 1. Snapshot
 
 | Item | Value |
 |---|---|
-| Current phase | **Phase 1 — COMPLETE: 14/14 `[VERIFIED_COMPLETE]`** (S6, 2026-10-21, after 5f64ea8). Phase 2 (S7) and Phase 3 (S2, worktree `.worktrees\phase3`) in progress |
+| Current phase | **Phase 1 — COMPLETE: 14/14 `[VERIFIED_COMPLETE]`** (S6, after 5f64ea8). **Phase 2 — COMPLETE: P2.01–P2.09 `[VERIFIED_COMPLETE]`** (S6 gate; merged into `main` by the orchestrator). Phase 3 (S2) in progress in worktree `.worktrees\phase3`, branch `phase3-core-search` |
 | Placeholder scanner (P1.12) | `eng\check-placeholders.ps1` → **26 files, 0 violations, 0 allowlisted, 0 stale, exit 0**. The four `TODO P1.11` cross-references now read "task(s) P1.11"; `eng\placeholder-allowlist.json` has `"entries": []` |
 | Toolchain | .NET SDK 10.0.402, Git 2.55.0, Inno Setup 6.7.3 (per-user: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) |
 | Pipeline (P1.11) | `eng\build.ps1` → `eng\publish.ps1` → `eng\installer.ps1 -AllowMissingBranding` → unversioned `dist\NexPane-Setup.exe` (55.35 MB, ProductVersion 0.1.0; never executed) |
 | Git | Repo on `main`, no remote. Recent commits: `c6b4d4f` scaffold, `0fe2b0a` decisions, `92abcb9` P1.11, `6e4bdbb` unversioned installer, `22fb2ba` QA audit, then the S1 QA-fix commit (see `git log -1`). Identity: `NexPane Dev <ewaisg@gmail.com>` |
 | Solution | `NexPane.sln`: 15 `src` projects, 16 test projects, 1 benchmark runner |
 | Build | `dotnet build NexPane.sln -c Release` → **Build succeeded. 0 Warning(s) 0 Error(s)** |
-| Tests | Default filter → **total: 108, failed: 0, succeeded: 108** (QA added 28 `GitIgnoreTests`) |
+| Tests | Default filter → **total: 185, failed: 0, succeeded: 185** (post-merge of Phase 2, 2026-10-21 k) |
 | App | `NexPane.exe` opens a 1280×800 window titled "NexPane" and exits 0 on `CloseMainWindow` |
-| Feature code | None yet |
+| Feature code | Phase 2 branding (AssetGen, icons, tray interop, theme tokens). Phase 3 code lives on branch `phase3-core-search` until merged |
 | User decisions | D1–D5 (ARCHITECTURE §20) + P1.14 (§21): network credentials in the Windows Credential Locker; AI keys via DPAPI/Credential Manager |
-| Blockers | None. P1.02 waits for the S6 re-run |
+| Blockers | None |
 
 ## 2. What exists on disk (tracked)
 
@@ -38,6 +38,17 @@ C:\Users\Ewais\Projects\NexPane\
 Package pins: Microsoft.Extensions.Hosting.WindowsServices 10.0.13, xunit.v3.mtp-v2 4.0.2, FluentAssertions [7.2.0], BenchmarkDotNet 0.15.8.
 
 ## 3. Just finished
+
+**2026-10-21 (k), orchestrator: merged `phase2-branding` into `main`**
+- Doc conflicts resolved: main's Phase 1 text kept; the branch's Phase 2 rows/notes taken. Code and assets merged cleanly. Post-merge `eng\build.ps1` and `eng\check-placeholders.ps1` re-run (results in the merge commit message).
+
+**2026-10-21 (QA-P2), S6: Phase 2 gate (P2.09) — all Phase 2 items VERIFIED**
+- Worked inside `.worktrees\phase2` only; scratch output in the S6 scratchpad and `%TEMP%\npqa2`.
+- `eng\build.ps1` exit 0 (0 warnings, 0 errors, 185/185, 0 skipped); `eng\check-placeholders.ps1` exit 0 (36 files); `eng\publish.ps1` exit 0 (465 files; no Svg.*/Skia/HarfBuzz/ExCSS in the output, so MS-PL Svg.Custom stays build-time only); `eng\installer.ps1` **without** `-AllowMissingBranding` exit 0, warning-free, `dist\NexPane-Setup.exe` 55,526,088 bytes (not executed).
+- AssetGen out-of-process twice: 23 files, identical SHA-256 between runs and with the committed assets.
+- Independent native checks (QA console tool): NexPane.ico 9 layers decode via `CreateIconFromResourceEx` and `LoadImage` at exact size (256 = PNG); tray icons 6 layers, glyph contrast 9:1 on both taskbar themes; 10 BMPs 24 bpp exact size; 9 PNGs RGBA; exe/service/setup RT_GROUP_ICON = 9 layers; runtime `WM_GETICON` 16x16 / 32x32; theme token contrasts recomputed.
+- **Manual icon review (P2.04/P2.09):** `IShellItemImageFactory` renders of the published `NexPane.exe` at 16/32/48/96/256 px (Explorer small → Extra-large) inspected as PNG: correct NexPane mark (white "N" with spark on a blue-indigo rounded tile), crisp at 256, recognisable at 16, transparent corners. Wizard bitmap (164x314) shows the logo lockup on navy, legible.
+- Advisory: `tray.ico` (full-colour tile) is not a taskbar-contrast glyph (2.6:1 dark, 1.0:1 light worst pixel); `VariantForCurrentTaskbar()` never selects it — Phase 4 should not show it in the notification area.
 
 **2026-10-21 (j), S6 QA: P1.02 → `[VERIFIED_COMPLETE]`; Phase 1 complete**
 - The 4 consistency defects from e9e59ab are fixed in 5f64ea8 (§13.2 GPU row, P6.30, P7.08, single HKCU `{AppId}_is1` rule in §19.3/§21/P4.43(d)/P7.14(3)(4) + cases (f)/(g)). Rule premise confirmed in the installed Inno 6.7.3 help (*Non Administrative Install Mode*: with admin rights available, a non-admin install's uninstaller "will always be marked as requiring administrative privileges").
@@ -113,9 +124,9 @@ TODO totals: 183 items: 9 VERIFIED_COMPLETE, 5 READY_FOR_QA, the rest PENDING.
 
 | Item | Owner | Status | Notes |
 |---|---|---|---|
-| P1.02 uninstall user-data mechanism | S6 | waiting (S1 → `[READY_FOR_QA]`, 2026-10-21 i) | Re-run: §13.2 GPU row, §18 installer row, §19.3 single HKCU-key rule, §21 "P1.02 rework", P4.43 (d), P6.30, P7.08, P7.14 (3)/(4)/(f)/(g) |
-| Phase 2 (branding/assets) | **S7** | `[PENDING]` | Start with P2.01 (logo SVGs), then P2.02 (`tools\NexPane.AssetGen`) |
-| Phase 3 (core FS, indexer, search) | **S2** | `[PENDING]` | Start with P3.01 (VfsPath) and P3.03 (Storage migrations). Can run in parallel with Phase 2 now that `.gitignore` is safe |
+| Phase 1 | — | `[VERIFIED_COMPLETE]` 14/14 | Closed |
+| Phase 2 (branding/assets) | S7 / S6 | `[VERIFIED_COMPLETE]` P2.01–P2.09 | Merged into `main` |
+| Phase 3 (core FS, indexer, search) | **S2** | `[IN_PROGRESS]` | Worktree `.worktrees\phase3`, branch `phase3-core-search`; S6 gate P3.36 there before the orchestrator merges |
 
 ## 5. Active issues / risks
 1. **Deviations from the original plan** (all recorded in ARCHITECTURE §21):
@@ -149,10 +160,27 @@ dotnet test --solution NexPane.sln -c Release --filter-not-trait "Category=Eleva
 powershell -NoProfile -ExecutionPolicy Bypass -File eng\check-placeholders.ps1               # exit 0 expected
 # QA (S6) re-run for P1.02: review ARCHITECTURE §19.3 "Uninstall ... per-user data" and §21 "P1.02 rework"; confirm no design relies on ExecAsOriginalUser:
 Select-String -Path docs\handoff\ARCHITECTURE.md -Pattern 'ExecAsOriginalUser'   # only the documented-limitation sentence in §19.3 and the struck-through §21 row
-# Phase 2 → S7 (P2.01, P2.02); Phase 3 → S2 in .worktrees\phase3 (branch phase3-core-search) — do not edit that worktree from main.
+# Phases 1-2 closed. Phase 3 → S2 in .worktrees\phase3 (branch phase3-core-search) — do not edit that worktree from main.
 ```
 
 ## 7. Session log
+
+### 2026-10-21 (k) — Orchestrator
+- Merged `phase2-branding` into `main`; resolved doc conflicts (main's Phase 1 text + the branch's Phase 2 text).
+
+### 2026-10-21 (QA-P2) — Subagent 6 (QA)
+- Ran the Phase 2 gate P2.09 in `.worktrees\phase2`; all P2 items verified (evidence in TODO.md and §3). Committed docs to `phase2-branding` only.
+
+### 2026-10-21 (h2) — Subagent 7 (Release & Installer Packaging Engineer), branch `phase2-branding`
+- **P2.01–P2.08 → `[READY_FOR_QA]`** (evidence inline in TODO.md).
+- **Design.** Rounded-square tile with a sky→indigo gradient (`#1FB6FF`→`#4338F5`), a white "N" made of two vertically offset panes joined by a translucent diagonal, and an amber spark (`#FFC24B`) at the top left.
+  - `nexpane-mark.svg` is the 16-unit-grid small-size variant.
+  - `nexpane-logo.svg` is a square stacked lockup: the detailed mark above a geometric-path wordmark in `#4D74FF`.
+- **Tool.** `tools\NexPane.AssetGen` (SkiaSharp 4.148.0 + Svg.Skia 5.2.3) writes 23 files into `assets\icons` and `assets\installer`; `--preview <png>` writes a review sheet.
+- **Wiring.** ApplicationIcon on App and IndexService; `MainWindow.Icon`; `NexPane.Shell.Tray.TrayIcon` (Shell_NotifyIconW); `Themes\Tokens.xaml`.
+- **Tests.** New `tests\NexPane.AssetGen.Tests` (50), plus UITests (FlaUI, icon group, theme contrast), Shell.Tests (tray) and IndexService.Tests (icon). Default suite **185/185**.
+- **Pipeline without `-AllowMissingBranding`.** build → publish (465 files) → installer → `dist\NexPane-Setup.exe` 55,520,871 bytes, never executed. The setup exe, `NexPane.exe` and `NexPane.IndexService.exe` icon groups each contain 16/20/24/32/40/48/64/128/256.
+- **Merge notes.** Small edits to `NexPane.Shell.csproj` (`AllowUnsafeBlocks`, `InternalsVisibleTo`), `Directory.Packages.props`, `NexPane.sln` and `THIRD-PARTY-NOTICES.txt`. Phase 3 may touch the same files.
 
 ### 2026-10-21 (j) — Subagent 6 (QA)
 - Re-verified P1.02 after 5f64ea8 (diff review, Inno help check in the S6 scratchpad, doc grep, full build + default suite + placeholder scan). VERIFIED → Phase 1 complete (14/14). Only TODO/STATE/HANDOFF changed; `.worktrees\` untouched.

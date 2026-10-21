@@ -98,8 +98,12 @@ NAudio                                             MIT                     https
 
 9. BUILD TOOLS (not redistributed)
 ----------------------------------
-SkiaSharp                                          MIT                     https://github.com/mono/SkiaSharp                                         [dev]
-Svg.Skia                                           MIT                     https://github.com/wieslawsoltes/Svg.Skia                                 [dev]
+SkiaSharp 4.148.0 (+ SkiaSharp.NativeAssets.Win32) MIT                     https://github.com/mono/SkiaSharp                                         [dev]
+HarfBuzzSharp 14.2.0 (dependency of Svg.Skia)      MIT                     https://github.com/mono/SkiaSharp                                         [dev]
+Svg.Skia 5.2.3 (+ Svg.Model, Svg.SceneGraph,       MIT                     https://github.com/wieslawsoltes/Svg.Skia                                 [dev]
+  Svg.Animation, ShimSkiaSharp)
+Svg.Custom 5.2.3 (SVG.NET fork, Svg.Skia dep.)     MS-PL                   https://github.com/wieslawsoltes/Svg.Skia                                 [dev]
+ExCSS 4.3.1 (dependency of Svg.Skia)               MIT                     https://github.com/TylerBrinks/ExCSS                                      [dev]
 Inno Setup 6                                       Inno Setup License      https://jrsoftware.org/isinfo.php                                         [dev]
 
 10. TEST TOOLS (not redistributed)
@@ -110,6 +114,7 @@ FluentAssertions 7.2.0                             Apache-2.0              https
 BenchmarkDotNet                                    MIT                     https://github.com/dotnet/BenchmarkDotNet                                 [dev]
 NSubstitute                                        BSD-3-Clause            https://github.com/nsubstitute/NSubstitute                                [dev]
 WireMock.Net                                       Apache-2.0              https://github.com/WireMock-Net/WireMock.Net                              [dev]
-FlaUI.UIA3                                         MIT                     https://github.com/FlaUI/FlaUI                                            [dev]
+FlaUI.UIA3 5.0.0                                   MIT                     https://github.com/FlaUI/FlaUI                                            [dev]
+System.Drawing.Common 10.0.13 (icon decoding tests) MIT                    https://github.com/dotnet/winforms                                        [dev]
 NetArchTest.Rules                                  MIT                     https://github.com/BenMorris/NetArchTest                                  [dev]
 coverlet.collector                                 MIT                     https://github.com/coverlet-coverage/coverlet                             [dev]
