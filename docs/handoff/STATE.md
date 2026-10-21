@@ -1,13 +1,14 @@
 # NexPane — Current State
 
 > Updated by every subagent at the end of every session. Newest entry is at the top of the Session Log.
-> Last update: **2026-10-21 (h)** by **Subagent 7 (Release & Installer Packaging)**: Phase 2 branding P2.01–P2.08 → `[READY_FOR_QA]` on branch `phase2-branding` (see Session Log). Previous: (g) S1 P1.02 rework.
+> Last update: **2026-10-21 (QA-P2)** by **Subagent 6 (QA, Verification & Security Inspector)**: Phase 2 gate P2.09 — P2.01–P2.09 `[VERIFIED_COMPLETE]` on branch `phase2-branding`. Note: the Phase 1 lines in this branch predate main's `8e92271` (Phase 1 is complete on main, 14/14); take main's Phase 1 text when merging.
 > Roster (user-mandated numbering): S1 Architect & State Scribe · S2 Core Systems & Indexing Engine · S3 Native Windows Shell & OS Integration · S4 AI & Semantic Pipeline · S5 UI/UX & Workspace · **S6 QA, Verification & Security Inspector (veto)** · S7 Release & Installer Packaging (incl. icons/assets). Older log entries below that say "S7 QA role" refer to the QA role, which is now **S6**.
 
 ## 1. Snapshot
 
 | Item | Value |
 |---|---|
+| Phase 2 (branch `phase2-branding`) | **COMPLETE — P2.01–P2.09 `[VERIFIED_COMPLETE]`** (S6, 2026-10-21). Build 0/0, 185/185 tests, placeholder scan clean, publish + installer (with branding) green. Merge into `main` needs doc-conflict resolution (HANDOFF/STATE/TODO) |
 | Current phase | **Phase 1 — 13/14 `[VERIFIED_COMPLETE]`; P1.02 `[READY_FOR_QA]`** (S1 rework: per-user data is removed by the app per user; the uninstaller purges only for per-user installs via plain `Exec`; nothing uses `ExecAsOriginalUser`). Phase 2 (S7) and Phase 3 (S2, worktree `.worktrees\phase3`, branch `phase3-core-search`) are in progress / may start |
 | Placeholder scanner (P1.12) | `eng\check-placeholders.ps1` → **26 files, 0 violations, 0 allowlisted, 0 stale, exit 0**. The four `TODO P1.11` cross-references now read "task(s) P1.11"; `eng\placeholder-allowlist.json` has `"entries": []` |
 | Toolchain | .NET SDK 10.0.402, Git 2.55.0, Inno Setup 6.7.3 (per-user: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) |
@@ -38,6 +39,16 @@ C:\Users\Ewais\Projects\NexPane\
 Package pins: Microsoft.Extensions.Hosting.WindowsServices 10.0.13, xunit.v3.mtp-v2 4.0.2, FluentAssertions [7.2.0], BenchmarkDotNet 0.15.8.
 
 ## 3. Just finished
+
+**2026-10-21 (QA-P2), S6: Phase 2 gate (P2.09) — all Phase 2 items VERIFIED**
+- Worked inside `.worktrees\phase2` only; scratch output in the S6 scratchpad and `%TEMP%\npqa2`.
+- `eng\build.ps1` exit 0 (0 warnings, 0 errors, 185/185, 0 skipped); `eng\check-placeholders.ps1` exit 0 (36 files); `eng\publish.ps1` exit 0 (465 files; no Svg.*/Skia/HarfBuzz/ExCSS in the output, so MS-PL Svg.Custom stays build-time only); `eng\installer.ps1` **without** `-AllowMissingBranding` exit 0, warning-free, `dist\NexPane-Setup.exe` 55,526,088 bytes (not executed).
+- AssetGen out-of-process twice: 23 files, identical SHA-256 between runs and with the committed assets.
+- Independent native checks (QA console tool): NexPane.ico 9 layers decode via `CreateIconFromResourceEx` and `LoadImage` at exact size (256 = PNG); tray icons 6 layers, glyph contrast 9:1 on both taskbar themes; 10 BMPs 24 bpp exact size; 9 PNGs RGBA; exe/service/setup RT_GROUP_ICON = 9 layers; runtime `WM_GETICON` 16x16 / 32x32; theme token contrasts recomputed.
+- **Manual icon review (P2.04/P2.09):** `IShellItemImageFactory` renders of the published `NexPane.exe` at 16/32/48/96/256 px (Explorer small → Extra-large) inspected as PNG: correct NexPane mark (white "N" with spark on a blue-indigo rounded tile), crisp at 256, recognisable at 16, transparent corners. Wizard bitmap (164x314) shows the logo lockup on navy, legible.
+- Advisory: `tray.ico` (full-colour tile) is not a taskbar-contrast glyph (2.6:1 dark, 1.0:1 light worst pixel); `VariantForCurrentTaskbar()` never selects it — Phase 4 should not show it in the notification area.
+- Merge risk vs main `8e92271`: `git merge-tree` → code/assets merge cleanly; **conflicts only in `docs/handoff/HANDOFF.md`, `STATE.md`, `TODO.md`** (both sides edited status text). Resolve by taking main's Phase 1 text and this branch's Phase 2 text, then re-run `eng\build.ps1` (main adds `GitIgnoreTests`).
+
 
 **2026-10-21 (g), S1: P1.02 rework — uninstall-time user-data removal**
 - **Research.** I decompiled the installed Inno Setup 6.7.3 help (`ISetup.chm`) into the S1 scratchpad (via its 8.3 short path, because `hh.exe` fails on long paths) and checked the APIs. The copy was deleted afterwards.
@@ -126,6 +137,9 @@ Select-String -Path docs\handoff\ARCHITECTURE.md -Pattern 'ExecAsOriginalUser'  
 ```
 
 ## 7. Session log
+
+### 2026-10-21 (QA-P2) — Subagent 6 (QA)
+- Ran the Phase 2 gate P2.09 in `.worktrees\phase2`; all P2 items verified (evidence in TODO.md and §3). Committed docs to `phase2-branding` only.
 
 ### 2026-10-21 (h) — Subagent 7 (Release & Installer Packaging Engineer), branch `phase2-branding`
 - **P2.01–P2.08 → `[READY_FOR_QA]`** (evidence inline in TODO.md).

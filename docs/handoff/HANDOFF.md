@@ -1,7 +1,7 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-21 (h) by Subagent 7: Phase 2 branding (P2.01–P2.08) → `[READY_FOR_QA]` on branch `phase2-branding`. Previous: (g) S1 P1.02 rework.
+> Last update: 2026-10-21 (QA-P2) by Subagent 6 (QA): Phase 2 gate passed — P2.01–P2.09 `[VERIFIED_COMPLETE]` on branch `phase2-branding`. (Phase 1 is complete on main `8e92271`; this branch's Phase 1 lines are older — keep main's on merge.)
 
 ## 1. Executive summary
 
@@ -18,6 +18,8 @@ The build → test → publish → installer pipeline (P1.11) is scripted in `en
   - The uninstaller purges only for per-user installs, via plain `Exec`, on an explicit Yes.
   - Admin-mode uninstalls keep per-user data and tell the user how to remove it.
   - See ARCHITECTURE §19.3 and §21 "P1.02 rework". Waiting for the S6 re-run.
+
+**Phase 2 (branding) is verified (S6, 2026-10-21):** generated assets in `assets/`, `tools/NexPane.AssetGen` (re-run: `dotnet run -c Release --project tools/NexPane.AssetGen -- --svg assets/brand/nexpane-logo.svg --mark assets/brand/nexpane-mark.svg --out assets`; output must stay byte-identical, enforced by `AssetGenDeterminismTests`), exe/window/setup icons, tray icon interop and theme tokens. Release installers now compile without `-AllowMissingBranding`. In the notification area use `tray-light.ico`/`tray-dark.ico` (via `TrayIcon.VariantForCurrentTaskbar()`), not the full-colour `tray.ico`.
 
 Phase 2 (S7, branding) and Phase 3 (S2, core systems, in its own worktree `.worktrees\phase3` on branch `phase3-core-search`) run in parallel. Do not edit that worktree from `main`.
 
