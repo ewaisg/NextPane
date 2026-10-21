@@ -1,7 +1,7 @@
 # NexPane — Current State
 
 > Updated by every subagent at the end of every session. Newest entry is at the top of the Session Log.
-> Last update: **2026-10-21 (g)** by **Subagent 1 (Lead Architect & State Scribe)**: P1.02 uninstall user-data mechanism reworked (no `ExecAsOriginalUser`) → `[READY_FOR_QA]`.
+> Last update: **2026-10-21 (h)** by **Subagent 7 (Release & Installer Packaging)**: Phase 2 branding P2.01–P2.08 → `[READY_FOR_QA]` on branch `phase2-branding` (see Session Log). Previous: (g) S1 P1.02 rework.
 > Roster (user-mandated numbering): S1 Architect & State Scribe · S2 Core Systems & Indexing Engine · S3 Native Windows Shell & OS Integration · S4 AI & Semantic Pipeline · S5 UI/UX & Workspace · **S6 QA, Verification & Security Inspector (veto)** · S7 Release & Installer Packaging (incl. icons/assets). Older log entries below that say "S7 QA role" refer to the QA role, which is now **S6**.
 
 ## 1. Snapshot
@@ -87,7 +87,7 @@ TODO totals: 183 items: 9 VERIFIED_COMPLETE, 5 READY_FOR_QA, the rest PENDING.
 | Item | Owner | Status | Notes |
 |---|---|---|---|
 | P1.02 uninstall user-data mechanism | S6 | waiting (S1 → `[READY_FOR_QA]`) | Re-run: §19.3, the §21 "P1.02 rework" row, P4.43, P7.14 |
-| Phase 2 (branding/assets) | **S7** | `[PENDING]` | Start with P2.01 (logo SVGs), then P2.02 (`tools\NexPane.AssetGen`) |
+| Phase 2 (branding/assets) | **S6** (QA) | P2.01–P2.08 `[READY_FOR_QA]` (S7, branch `phase2-branding`, worktree `.worktrees\phase2`) | P2.09: run the P2 tests, review the icons manually (`--preview` sheet, Explorer Large/Extra-large), record the review here |
 | Phase 3 (core FS, indexer, search) | **S2** | `[PENDING]` | Start with P3.01 (VfsPath) and P3.03 (Storage migrations). Can run in parallel with Phase 2 now that `.gitignore` is safe |
 
 ## 5. Active issues / risks
@@ -126,6 +126,19 @@ Select-String -Path docs\handoff\ARCHITECTURE.md -Pattern 'ExecAsOriginalUser'  
 ```
 
 ## 7. Session log
+
+### 2026-10-21 (h) — Subagent 7 (Release & Installer Packaging Engineer), branch `phase2-branding`
+- **P2.01–P2.08 → `[READY_FOR_QA]`** (evidence inline in TODO.md).
+- **Design.** Rounded-square tile with a sky→indigo gradient (`#1FB6FF`→`#4338F5`), a white "N" made of two vertically offset panes joined by a translucent diagonal, and an amber spark (`#FFC24B`) at the top left.
+  - `nexpane-mark.svg` is the 16-unit-grid small-size variant.
+  - `nexpane-logo.svg` is a square stacked lockup: the detailed mark above a geometric-path wordmark in `#4D74FF`.
+- **Tool.** `tools\NexPane.AssetGen` (SkiaSharp 4.148.0 + Svg.Skia 5.2.3) writes 23 files into `assets\icons` and `assets\installer`; `--preview <png>` writes a review sheet.
+- **Wiring.** ApplicationIcon on App and IndexService; `MainWindow.Icon`; `NexPane.Shell.Tray.TrayIcon` (Shell_NotifyIconW); `Themes\Tokens.xaml`.
+- **Tests.** New `tests\NexPane.AssetGen.Tests` (50), plus UITests (FlaUI, icon group, theme contrast), Shell.Tests (tray) and IndexService.Tests (icon). Default suite **185/185**.
+- **Checks.** Build 0/0; placeholder scan exit 0.
+- **Pipeline without `-AllowMissingBranding`.** build → publish (465 files) → installer → `dist\NexPane-Setup.exe` 55,520,871 bytes, never executed. The setup exe, `NexPane.exe` and `NexPane.IndexService.exe` icon groups each contain 16/20/24/32/40/48/64/128/256.
+- **Manual review for S6.** I reviewed the 16/32/256 renders on light and dark backgrounds; Explorer Large/Extra-large views have not been checked.
+- **Merge notes.** Small edits to `NexPane.Shell.csproj` (`AllowUnsafeBlocks`, `InternalsVisibleTo`), `Directory.Packages.props`, `NexPane.sln` and `THIRD-PARTY-NOTICES.txt`. Phase 3 may touch the same files.
 
 ### 2026-10-21 (g) — Subagent 1 (Lead Architect & State Scribe)
 - Reworked the P1.02 uninstall user-data mechanism after S6's rejection, verifying every Inno API against the installed 6.7.3 help.
