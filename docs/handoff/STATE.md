@@ -1,75 +1,108 @@
 # NexPane — Current State
 
-> Updated by every subagent at the end of every session. Newest entry on top of the Session Log.
+> Updated by every subagent at the end of every session. Newest entry is at the top of the Session Log.
 > Last update: **2026-10-21** by **Subagent 1 (Lead Architect & State Scribe)**.
 
 ## 1. Snapshot
 
 | Item | Value |
 |---|---|
-| Current phase | **Phase 1 — Architecture / Stack Lock / Handoff Init** |
-| Phase 1 progress | Docs complete (`[READY_FOR_QA]`); toolchain install `[IN_PROGRESS]` (ORC); repo/solution init `[PENDING]` (ORC) |
-| Source code | **None yet.** No `.sln`, no `.csproj`, no `.cs` files exist. |
-| Git | Not initialized (no `.git` directory). |
-| Build status | N/A (no solution). |
-| Test status | N/A. |
-| Blockers | Toolchain install must finish before P1.09. User decisions Q1–Q6 (ARCHITECTURE §20) pending; only Q1 blocks an item (P1.13). |
+| Current phase | **Phase 1 — Architecture / Stack Lock / Handoff Init** (all deliverables done except P1.11 and P1.12) |
+| Toolchain | .NET SDK 10.0.402, Git 2.55.0, Inno Setup 6 (per-user: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) |
+| Git | Repo on `main`, no remote. Commits: `c6b4d4f` (scaffold) and a follow-up docs/decisions commit (see `git log`). Local identity: `NexPane Dev <ewaisg@gmail.com>`. |
+| Solution | `NexPane.sln`: 15 `src` projects, 16 test projects, 1 benchmark runner |
+| Build | `dotnet build NexPane.sln -c Release` → **Build succeeded. 0 Warning(s) 0 Error(s)** |
+| Tests | Default filter → **total: 47, failed: 0, succeeded: 47, skipped: 0** |
+| App | `NexPane.exe` opens a 1280×800 window titled "NexPane"; `CloseMainWindow` exits with code 0 |
+| Feature code | None yet. Library projects are empty shells with correct references. |
+| User decisions | D1–D5 recorded (ARCHITECTURE §20): proprietary EULA; unsigned; no Windows 11 top-level menu; Index Service checked by default (admin installs); no Explorer replacement; GPU Whisper in scope |
+| Blockers | None |
 
-## 2. What exists on disk
+## 2. What exists on disk (tracked)
 
 ```
 C:\Users\Ewais\Projects\NexPane\
-├─ .gitignore                       (new)
-├─ README.md                        (new)
-└─ docs\handoff\
-   ├─ ARCHITECTURE.md               (new — 22 sections)
-   ├─ TODO.md                       (new — Phases 1–7)
-   ├─ STATE.md                      (this file)
-   └─ HANDOFF.md                    (new)
+├─ NexPane.sln  global.json  Directory.Build.props  Directory.Packages.props
+├─ .editorconfig  .gitattributes  .gitignore  README.md  LICENSE.txt  THIRD-PARTY-NOTICES.txt
+├─ docs\handoff\  ARCHITECTURE.md  TODO.md  STATE.md  HANDOFF.md
+├─ src\
+│  ├─ NexPane.Core ............ net10.0, no references
+│  ├─ NexPane.Shell, NexPane.Storage ........................ → Core
+│  ├─ NexPane.Security, .Network ............................ → Core, Shell
+│  ├─ NexPane.Indexing, .Metadata ........................... → Core, Shell, Storage
+│  ├─ NexPane.Search, .Sync, .AI ............................ → Core, Storage
+│  ├─ NexPane.Archives, .Scripting .......................... → Core
+│  ├─ NexPane.Preview (WPF lib) ............................. → Core, Shell
+│  ├─ NexPane.App (WPF exe, AssemblyName NexPane) ........... → all of the above; App.xaml, MainWindow.xaml, app.manifest
+│  └─ NexPane.IndexService (worker exe) ..................... → Core, Shell, Indexing; Program.BuildHost, service "NexPaneIndex"
+└─ tests\
+   ├─ Directory.Build.props (xUnit v3 MTP + FluentAssertions 7.2.0 for *Tests)   Shared\ModuleAssembly.cs
+   ├─ NexPane.<Module>.Tests ×14  (ModuleBuildTests: x64 + TFM/platform attributes)
+   ├─ NexPane.IndexService.Tests  (+ HostLifetimeTests: start/stop, service name)
+   ├─ NexPane.Architecture.Tests  (29 tests: layering + repository conventions)
+   ├─ NexPane.UITests             (AppBuildTests; FlaUI added in Phase 4)
+   └─ NexPane.Benchmarks          (BenchmarkSwitcher runner; benchmarks added in P3.35)
 ```
 
-## 3. Just finished
-- P1.02 ARCHITECTURE.md, P1.03 TODO.md, P1.04 STATE.md, P1.05 HANDOFF.md, P1.06 README.md, P1.07 .gitignore, P1.08 traceability matrix (ARCHITECTURE §22) — all `[READY_FOR_QA]`.
-- Installer AppId fixed: `{23676795-F60E-4EAF-95C6-C4D81BAD01C1}`.
+Package pins (`Directory.Packages.props`): Microsoft.Extensions.Hosting.WindowsServices 10.0.13, xunit.v3.mtp-v2 4.0.2, FluentAssertions [7.2.0], BenchmarkDotNet 0.15.8.
+
+## 3. Just finished (this session)
+- P1.01 toolchain: verified, `[READY_FOR_QA]` (installed by ORC).
+- P1.09 repo, solution and test framework: `[READY_FOR_QA]`; initial commit `c6b4d4f`.
+- P1.10 architecture layering tests, including the negative check (a forbidden `Search → Indexing` reference fails 2 tests; reverted): `[READY_FOR_QA]`.
+- P1.13 LICENSE.txt (proprietary EULA) and THIRD-PARTY-NOTICES.txt: `[READY_FOR_QA]`.
+- User decisions D1–D5 recorded in ARCHITECTURE §20/§21, TODO (P1.13, P6.26–P6.30, P7.08, P7.09, P7.11, P7.12) and HANDOFF §9.
+- New TODO items: P3.37 (NetArchTest type-level rules) and P6.26–P6.30 (GPU Whisper). The TODO now has 175 items: 11 `[READY_FOR_QA]`, 164 `[PENDING]`.
 
 ## 4. Active work
 
 | Item | Owner | Status | Notes |
 |---|---|---|---|
-| P1.01 Toolchain install (.NET 10 SDK, Inno Setup 6, Git) | ORC | `[IN_PROGRESS]` | Running in parallel via winget; not verified by S1 (S1 did not run dotnet/git by instruction). |
-| P1.09 Git repo + solution + test framework | ORC | `[PENDING]` | Starts after P1.01 verification. |
+| P1.11 eng scripts (`build.ps1`, `publish.ps1` with optional skipped signing, `installer.ps1`) | S1 | `[PENDING]` | Next |
+| P1.12 `eng/check-placeholders.ps1` | S1 | `[PENDING]` | Next |
+| Phase 2 / Phase 3 kickoff | S2 / S3 | `[PENDING]` | Can start now, in parallel |
 
 ## 5. Active issues / risks
-1. Toolchain not yet verified — `dotnet`, `git`, `ISCC.exe` may not be on PATH in the current shell until a new terminal is opened (winget updates PATH for new processes only).
-2. FluentAssertions must be pinned to `7.2.0` (v8+ commercial license) — enforce in `Directory.Packages.props`.
-3. `xunit.v3` + STA tests: use the in-repo `StaTestRunner` helper (ARCHITECTURE §18) rather than relying on a third-party STA attribute.
-4. Open user questions Q1–Q6 (ARCHITECTURE §20). Q1 (NexPane license) blocks P1.13 only.
+1. **Deviations from the original plan** (all recorded in ARCHITECTURE §21):
+   - The test runner is Microsoft.Testing.Platform, so the test command syntax changed (see §6).
+   - `tools/NexPane.AssetGen` is deferred to P2.02.
+   - `NexPane.IndexService.Tests` was added.
+   - Layering is enforced by parsing .csproj files; NetArchTest type-level rules move to P3.37.
+2. Every test project must keep at least one test: Microsoft.Testing.Platform fails an assembly with zero tests (exit code 8).
+3. FluentAssertions 7 `OnlyContain` fails on empty collections; use `NotContain(x => !predicate)`.
+4. The EULA in LICENSE.txt was drafted without legal review; a lawyer should review it before public release.
+5. The orchestrator's HANDOFF §3 `$Iscc` line had the `| Where-Object` pipeline inside a trailing comment, which made `$Iscc` an array of all three candidate paths. This is fixed in HANDOFF §3.
+6. NuGet audit warnings (NU1901–NU1904) are deliberately not errors; QA treats them as release blockers (P7.04).
 
-## 6. Exact next commands (run in a NEW PowerShell window after toolchain install)
+## 6. Exact next commands (new PowerShell window)
 
 ```powershell
-# 1) Verify toolchain (P1.01 acceptance)
-dotnet --list-sdks
-git --version
-Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"; Test-Path "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
-
-# 2) Initialize repo (P1.09)
+$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
 Set-Location C:\Users\Ewais\Projects\NexPane
-git init -b main
-dotnet new globaljson --sdk-version 10.0.100 --roll-forward latestFeature
-dotnet new sln -n NexPane
-# then create projects exactly per ARCHITECTURE.md §3 (see HANDOFF.md §4 for the full scripted list),
-# add Directory.Build.props / Directory.Packages.props / .editorconfig / .gitattributes,
+git status; git log --oneline -3
 dotnet build NexPane.sln -c Release
-dotnet test NexPane.sln -c Release
-git add -A
-git commit -m "Phase 1: architecture docs, solution skeleton, test framework"
+dotnet test --solution NexPane.sln -c Release --filter-not-trait "Category=Elevated" --filter-not-trait "Category=Live"
+# Then: implement P1.11 (eng\build.ps1, eng\publish.ps1, eng\installer.ps1) and P1.12 (eng\check-placeholders.ps1),
+# or hand Phase 2 to S2 (start with P2.01 logo SVGs, then P2.02 tools\NexPane.AssetGen)
+# and Phase 3 to S3 (start with P3.01 VfsPath, P3.03 Storage migrations).
 ```
 
 ## 7. Session log
 
-### 2026-10-21 — Subagent 1 (Lead Architect & State Scribe)
-- Wrote ARCHITECTURE.md (stack rationale, layout, layering, threading, 5 Mermaid flows + dependency graph, full SQL for `index.db`/`app.db`, C# contracts, packages/licenses, security, budgets, testing, branding/installer, 24 risks, 6 open questions, decision log, traceability).
-- Wrote TODO.md (Phases 1–7, 169 items, each with owner + acceptance test), STATE.md, HANDOFF.md, README.md, .gitignore.
-- Key decisions: Jint for scripting; 7z.dll (SevenZipSharp) + SharpCompress fallback, RAR read-only; brute-force float32 vector search with TensorPrimitives; separate LocalSystem index service for USN/MFT; MediaElement (no LibVLC); Markdig→WebView2; official OpenAI + Anthropic SDKs, AWSSDK.BedrockRuntime, REST for Gemini.
-- Did not run dotnet/git (instructed). No code written.
+### 2026-10-21 (b) — Subagent 1 (Lead Architect & State Scribe)
+- Executed P1.09 at the orchestrator's request:
+  - Ran `git init -b main`, pinned `global.json` to 10.0.402 with latestFeature roll-forward and MTP runner, and created the classic-format `NexPane.sln`.
+  - Hand-wrote all csproj files (no template boilerplate) and added Directory.Build.props, Directory.Packages.props, .editorconfig and .gitattributes.
+  - Built a minimal WPF window and the IndexService host.
+- Wrote the architecture tests (29) and per-module build tests. Build: 0 warnings, 0 errors. Tests: 47/47 pass. App window verified.
+- Commit `c6b4d4f` "Phase 1: architecture docs, solution skeleton, test framework".
+- Recorded user decisions D1–D5. Wrote LICENSE.txt and THIRD-PARTY-NOTICES.txt. Designed GPU Whisper (§13.2) and added P6.26–P6.30.
+
+### 2026-10-21 (a) — Subagent 1 (Lead Architect & State Scribe)
+- Wrote ARCHITECTURE.md:
+  - stack rationale, layout, layering and threading;
+  - 5 Mermaid flows plus a dependency graph;
+  - full SQL for `index.db` and `app.db`, plus C# contracts;
+  - packages and licenses, security, performance budgets and testing;
+  - branding and installer, 24 risks, open questions, decision log and traceability.
+- Wrote TODO.md, STATE.md, HANDOFF.md, README.md and .gitignore.

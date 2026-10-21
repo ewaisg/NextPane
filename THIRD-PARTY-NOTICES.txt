@@ -1,0 +1,109 @@
+NEXPANE THIRD-PARTY NOTICES
+===========================
+
+NexPane (Copyright (c) 2026 NexPane, proprietary - see LICENSE.txt) uses the third-party components listed below.
+Each component is licensed by its respective owners under the license identified. Versions in use are pinned in
+Directory.Packages.props (NuGet) and eng/third-party.lock.json (native binaries and downloads).
+
+Full license texts for every shipped component are appended to this file before each release (release task P7.06).
+Components licensed under the GNU LGPL are used unmodified and dynamically linked; you may replace them with
+compatible modified versions. Their source code is available from the project URLs listed below.
+
+Status legend:  [shipped]   included in the current build output
+                [planned]   added by the development phase that first uses it (ARCHITECTURE.md section 15)
+                [download]  not installed by default; downloaded only on explicit user request
+                [dev]       used only to build or test NexPane; not redistributed
+
+
+1. RUNTIME AND HOSTING
+----------------------
+.NET 10 Runtime, Windows Desktop Runtime (WPF)      MIT                     https://github.com/dotnet/runtime, https://github.com/dotnet/wpf          [shipped]
+Microsoft.Extensions.Hosting.WindowsServices (and   MIT                     https://github.com/dotnet/runtime                                         [shipped]
+  Microsoft.Extensions.Hosting / DependencyInjection /
+  Logging / Options / Configuration dependencies)
+Microsoft.Extensions.Http.Resilience               MIT                     https://github.com/dotnet/extensions                                      [planned]
+Serilog                                            Apache-2.0              https://github.com/serilog/serilog                                        [planned]
+Serilog.Extensions.Hosting                         Apache-2.0              https://github.com/serilog/serilog-extensions-hosting                     [planned]
+Serilog.Sinks.File                                 Apache-2.0              https://github.com/serilog/serilog-sinks-file                             [planned]
+CommunityToolkit.Mvvm                              MIT                     https://github.com/CommunityToolkit/dotnet                                [planned]
+Microsoft.Windows.CsWin32 (build-time generator)   MIT                     https://github.com/microsoft/CsWin32                                      [dev]
+
+2. STORAGE AND SECURITY
+-----------------------
+Microsoft.Data.Sqlite                              MIT                     https://github.com/dotnet/efcore                                          [planned]
+SQLitePCLRaw.bundle_e_sqlite3                      Apache-2.0              https://github.com/ericsink/SQLitePCL.raw                                 [planned]
+SQLite                                             Public Domain           https://sqlite.org                                                        [planned]
+System.Security.Cryptography.ProtectedData         MIT                     https://github.com/dotnet/runtime                                         [planned]
+System.Numerics.Tensors                            MIT                     https://github.com/dotnet/runtime                                         [planned]
+
+3. USER INTERFACE AND PREVIEW
+-----------------------------
+Dirkster.AvalonDock                                MS-PL                   https://github.com/Dirkster99/AvalonDock                                  [planned]
+Dirkster.AvalonDock.Themes.VS2013                  MS-PL                   https://github.com/Dirkster99/AvalonDock                                  [planned]
+AvalonEdit                                         MIT                     https://github.com/icsharpcode/AvalonEdit                                 [planned]
+Markdig                                            BSD-2-Clause            https://github.com/xoofx/markdig                                          [planned]
+Microsoft.Web.WebView2                             BSD-3-Clause (Microsoft) https://www.nuget.org/packages/Microsoft.Web.WebView2                     [planned]
+Microsoft Edge WebView2 Evergreen Bootstrapper     Microsoft WebView2 Runtime distribution terms
+                                                                           https://developer.microsoft.com/microsoft-edge/webview2/                  [planned]
+Docnet.Core                                        MIT                     https://github.com/GowenGit/docnet                                        [planned]
+PDFium (bundled in Docnet.Core)                    BSD-3-Clause / Apache-2.0  https://pdfium.googlesource.com/pdfium/                                [planned]
+
+4. CONTENT EXTRACTION AND METADATA
+----------------------------------
+UglyToad.PdfPig                                    Apache-2.0              https://github.com/UglyToad/PdfPig                                        [planned]
+PDFsharp                                           MIT                     https://github.com/empira/PDFsharp                                        [planned]
+DocumentFormat.OpenXml                             MIT                     https://github.com/dotnet/Open-XML-SDK                                    [planned]
+MimeKit                                            MIT                     https://github.com/jstedfast/MimeKit                                      [planned]
+MsgReader                                          MIT                     https://github.com/Sicos1977/MSGReader                                    [planned]
+MetadataExtractor                                  Apache-2.0              https://github.com/drewnoakes/metadata-extractor-dotnet                   [planned]
+TagLibSharp                                        LGPL-2.1                https://github.com/mono/taglib-sharp                                      [planned]
+
+5. ARCHIVES
+-----------
+7-Zip 7z.dll (x64)                                 GNU LGPL-2.1 with unRAR license restriction; BSD-3-Clause for some code
+                                                                           https://www.7-zip.org                                                     [planned]
+                                                   unRAR restriction: the unRAR code may not be used to develop a
+                                                   RAR (WinRAR) compatible archiver. NexPane offers RAR extraction only.
+Squid-Box.SevenZipSharp                            LGPL-3.0                https://github.com/squid-box/SevenZipSharp                                [planned]
+SharpCompress                                      MIT                     https://github.com/adamhathcock/sharpcompress                             [planned]
+
+6. NETWORK
+----------
+SSH.NET                                            MIT                     https://github.com/sshnet/SSH.NET                                         [planned]
+FluentFTP                                          MIT                     https://github.com/robinrodricks/FluentFTP                                [planned]
+WebDav.Client                                      MIT                     https://github.com/skazantsev/WebDavClient                                [planned]
+
+7. SCRIPTING
+------------
+Jint                                               BSD-2-Clause            https://github.com/sebastienros/jint                                      [planned]
+
+8. ARTIFICIAL INTELLIGENCE AND MEDIA
+------------------------------------
+OpenAI (.NET SDK)                                  MIT                     https://github.com/openai/openai-dotnet                                   [planned]
+Anthropic (.NET SDK)                               MIT                     https://github.com/anthropics/anthropic-sdk-csharp                        [planned]
+AWSSDK.BedrockRuntime, AWSSDK.Bedrock, AWSSDK.Core Apache-2.0              https://github.com/aws/aws-sdk-net                                        [planned]
+Whisper.net, Whisper.net.Runtime                   MIT                     https://github.com/sandrohanea/whisper.net                                [planned]
+whisper.cpp / ggml (inside Whisper.net runtimes)   MIT                     https://github.com/ggml-org/whisper.cpp                                   [planned]
+OpenAI Whisper model weights (ggml conversions)    MIT                     https://huggingface.co/ggerganov/whisper.cpp                              [download]
+Whisper.net.Runtime.Cuda                           MIT                     https://github.com/sandrohanea/whisper.net                                [download]
+Whisper.net.Runtime.Vulkan                         MIT                     https://github.com/sandrohanea/whisper.net                                [download]
+NVIDIA CUDA runtime redistributables               NVIDIA CUDA Toolkit EULA (redistributable components, Attachment A)
+  (cudart64_12.dll, cublas64_12.dll, cublasLt64_12.dll)                    https://docs.nvidia.com/cuda/eula/                                        [download]
+NAudio                                             MIT                     https://github.com/naudio/NAudio                                          [planned]
+
+9. BUILD TOOLS (not redistributed)
+----------------------------------
+SkiaSharp                                          MIT                     https://github.com/mono/SkiaSharp                                         [dev]
+Svg.Skia                                           MIT                     https://github.com/wieslawsoltes/Svg.Skia                                 [dev]
+Inno Setup 6                                       Inno Setup License      https://jrsoftware.org/isinfo.php                                         [dev]
+
+10. TEST TOOLS (not redistributed)
+----------------------------------
+xunit.v3 / xunit.v3.mtp-v2                         Apache-2.0              https://github.com/xunit/xunit                                            [dev]
+Microsoft.Testing.Platform                         MIT                     https://github.com/microsoft/testfx                                       [dev]
+FluentAssertions 7.2.0                             Apache-2.0              https://github.com/fluentassertions/fluentassertions                      [dev]
+BenchmarkDotNet                                    MIT                     https://github.com/dotnet/BenchmarkDotNet                                 [dev]
+NSubstitute                                        BSD-3-Clause            https://github.com/nsubstitute/NSubstitute                                [dev]
+WireMock.Net                                       Apache-2.0              https://github.com/WireMock-Net/WireMock.Net                              [dev]
+FlaUI.UIA3                                         MIT                     https://github.com/FlaUI/FlaUI                                            [dev]
+coverlet.collector                                 MIT                     https://github.com/coverlet-coverage/coverlet                             [dev]

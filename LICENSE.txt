@@ -1,0 +1,45 @@
+NEXPANE END-USER LICENSE AGREEMENT
+
+Copyright (c) 2026 NexPane. All rights reserved.
+
+IMPORTANT - READ CAREFULLY: This End-User License Agreement ("Agreement") is a legal agreement between you (either an individual or a single entity, "you") and NexPane ("Licensor") for the NexPane software, including the executable files, libraries, documentation, icons and any updates provided by Licensor (collectively, the "Software"). By installing, copying or otherwise using the Software, you agree to be bound by the terms of this Agreement. If you do not agree, do not install or use the Software.
+
+1. LICENSE GRANT
+Subject to your compliance with this Agreement, Licensor grants you a limited, non-exclusive, non-transferable, non-sublicensable, revocable license to install and use the Software on computers that you own or control, for your personal or internal business purposes.
+
+2. RESERVATION OF RIGHTS
+The Software is licensed, not sold. Licensor and its licensors retain all right, title and interest in and to the Software, including all intellectual property rights. All rights not expressly granted in this Agreement are reserved by Licensor.
+
+3. RESTRICTIONS
+Except to the extent such restrictions are prohibited by applicable law, you may not:
+  (a) copy the Software, except for installation as permitted above and one backup copy;
+  (b) modify, translate, adapt or create derivative works of the Software;
+  (c) reverse engineer, decompile or disassemble the Software;
+  (d) rent, lease, lend, sell, sublicense, distribute or otherwise transfer the Software to any third party;
+  (e) remove, alter or obscure any proprietary notices, labels or marks on the Software;
+  (f) use the Software to violate any law or the rights of any third party.
+
+4. THIRD-PARTY COMPONENTS
+The Software includes third-party components that are licensed under their own terms, listed in the file THIRD-PARTY-NOTICES.txt installed with the Software. Those terms govern your use of the respective components and, where they grant rights that conflict with this Agreement (for example, the right to replace a component licensed under the GNU Lesser General Public License with a modified version), those terms prevail for that component only.
+
+5. THIRD-PARTY SERVICES AND YOUR DATA
+Certain optional features send content you select (for example, file text, images or audio) to third-party artificial-intelligence or network services that you configure, such as Microsoft Azure, Google, Anthropic, OpenAI, Amazon Web Services or servers you connect to. Such transfers occur only after you configure the service and consent within the Software. Your use of those services is governed by your agreements with their providers, and you are responsible for any fees they charge and for having the right to send that content. Licensor does not operate those services and is not responsible for them.
+The Software does not collect or transmit usage telemetry to Licensor. Credentials you enter are stored on your computer using Windows Credential Manager and Windows Data Protection.
+
+6. OPTIONAL DOWNLOADS
+At your request, the Software may download optional components (for example, speech-recognition models or GPU runtime libraries) from their publishers. Such components are subject to their publishers' license terms, which are presented or referenced before download.
+
+7. UPDATES
+Licensor may, but is not obligated to, provide updates. Updates are governed by this Agreement unless accompanied by separate terms.
+
+8. TERMINATION
+This Agreement is effective until terminated. Your rights under this Agreement terminate automatically if you fail to comply with any of its terms. Upon termination, you must stop using the Software and uninstall it. Sections 2, 4, 5, 9, 10 and 11 survive termination.
+
+9. DISCLAIMER OF WARRANTIES
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. LICENSOR DOES NOT WARRANT THAT THE SOFTWARE WILL BE ERROR-FREE OR UNINTERRUPTED, OR THAT RESULTS PRODUCED BY AUTOMATED OR ARTIFICIAL-INTELLIGENCE FEATURES WILL BE ACCURATE. THE SOFTWARE PERFORMS FILE OPERATIONS (INCLUDING COPY, MOVE, RENAME, DELETE AND SYNCHRONIZATION) AT YOUR DIRECTION; YOU ARE RESPONSIBLE FOR MAINTAINING BACKUPS OF YOUR DATA.
+
+10. LIMITATION OF LIABILITY
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL LICENSOR BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF DATA, PROFITS, REVENUE OR BUSINESS, ARISING OUT OF OR RELATED TO THIS AGREEMENT OR THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. LICENSOR'S TOTAL LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED THE AMOUNT YOU PAID FOR THE SOFTWARE, IF ANY. SOME JURISDICTIONS DO NOT ALLOW THE EXCLUSION OR LIMITATION OF CERTAIN DAMAGES, SO SOME OF THE ABOVE MAY NOT APPLY TO YOU.
+
+11. GENERAL
+This Agreement is the entire agreement between you and Licensor regarding the Software and supersedes any prior understandings. If any provision is held unenforceable, it will be modified to the minimum extent necessary to make it enforceable, and the remaining provisions remain in effect. Failure to enforce any provision is not a waiver. You may not assign this Agreement without Licensor's prior written consent.

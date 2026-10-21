@@ -122,15 +122,18 @@ C:\Users\Ewais\Projects\NexPane\
 │  ├─ NexPane.Shell.Tests/          # STA integration tests against real shell
 │  ├─ NexPane.Security.Tests/  NexPane.Archives.Tests/  NexPane.Network.Tests/  NexPane.Sync.Tests/
 │  ├─ NexPane.Metadata.Tests/  NexPane.Scripting.Tests/  NexPane.AI.Tests/  NexPane.Preview.Tests/
-│  ├─ NexPane.Architecture.Tests/   # NetArchTest dependency rules (§4)
+│  ├─ NexPane.IndexService.Tests/   # service host lifetime (start/stop), later pipe protocol
+│  ├─ NexPane.Architecture.Tests/   # layering + repo convention rules (§4), parsed from .csproj files
+│  ├─ Shared/                       # ModuleAssembly.cs, linked into every *Tests project (x64/TFM assertions)
+│  ├─ Directory.Build.props         # makes *Tests projects xUnit v3 (Microsoft.Testing.Platform) executables
 │  ├─ NexPane.Benchmarks/           # BenchmarkDotNet perf budgets (§17)
 │  ├─ NexPane.UITests/              # FlaUI end-to-end
 │  └─ TestAssets/                   # fixture files: archives, images w/ EXIF, mp3 w/ ID3, PDFs, scanned PDF, wav
 ├─ tools/
-│  └─ NexPane.AssetGen/             # console: SVG → PNG → multi-res ICO, installer BMPs
+│  └─ NexPane.AssetGen/             # console: SVG → PNG → multi-res ICO, installer BMPs (created in P2.02)
 ├─ installer/
 │  ├─ NexPane.iss                   # Inno Setup 6 script
-│  └─ license.rtf  (generated from LICENSE.txt)
+│  └─ (LicenseFile points at ..\LICENSE.txt — proprietary EULA, decision D1)
 ├─ build/                           # (ignored) intermediate + publish output
 └─ dist/                            # (ignored) NexPane-Setup-<ver>.exe
 ```
@@ -192,7 +195,22 @@ graph TD
 | L3 Presentation | Preview, App | Preview references L0/L1 only. App is the only composition root. |
 | Hosts | IndexService | References Indexing (protocol + USN reader) and below. |
 
-Enforced by `NexPane.Architecture.Tests` (NetArchTest.Rules): one test per rule above; a violation fails CI.
+Enforced by `NexPane.Architecture.Tests`, which parses every `.csproj` under `src/` and checks the following, so any violation fails the test run:
+- the set of `src` projects equals the layer table, so new projects must be classified in `LayeringRules.cs`;
+- each project's `ProjectReference`s are a subset of its allowed layers;
+- there are no L2→L2 references;
+- Core has no references or packages and targets plain `net10.0`;
+- only L3 projects use WPF, and none use WinForms;
+- there are no raw `<Reference>` items;
+- nothing references App or IndexService;
+- no `src` project references a test project;
+- the project graph is acyclic.
+
+Repository conventions are also checked: every project is in the `.sln`, central package versions are used, FluentAssertions is pinned at `[7.2.0]`, Directory.Build.props locks the stack, and executables are neither trimmed nor single-file.
+
+Project-level checks are complete for assembly dependencies, because a `ProjectReference` is the only way to obtain one. Type-level rules (e.g. "no `System.Windows` types in Shell") will be added with NetArchTest.Rules once modules contain types (P1.10 follow-up in Phase 3).
+
+Verified 2026-10-21: temporarily adding `NexPane.Search → NexPane.Indexing` made `Project_references_only_allowed_layers(NexPane.Search)` and `Feature_modules_never_reference_each_other` fail; the change was then reverted.
 
 **Composition**: `Microsoft.Extensions.Hosting` generic host inside the WPF app (`App.OnStartup` builds `IHost`); each module exposes `IServiceCollection Add<Module>(this IServiceCollection, IConfiguration)`.
 
@@ -1263,6 +1281,7 @@ Notes:
 | **NL → query** | System prompt contains the grammar (§8), field table, today's date and 25 few-shot pairs; response requested as JSON `{"query": "...", "explanation": "..."}` (JSON schema / JSON mode where supported). Output is **parsed and validated** by `IQueryParser`; invalid output gets one repair round-trip with diagnostics; the result is shown for the user to accept/edit — never auto-executed with side effects. |
 | **Summarize / Translate / Prepare a Reply** | Input from `IContentIndex.GetTextAsync` or live extraction; long documents use map-reduce (chunk summaries → final summary) when text exceeds 60 % of the model's context. Prepare-a-Reply supports `.eml` (MimeKit) and `.msg` (MsgReader): extracts thread, produces a draft reply into an editable panel with "Copy" and "Save as .eml" — **NexPane never sends mail**. |
 | **Transcription** | Decode with NAudio `MediaFoundationReader` → resample to 16 kHz mono PCM16 → local `Whisper.net` (ggml models `tiny`/`base`/`small`/`medium`/`large-v3-turbo`, downloaded on demand from the whisper.cpp Hugging Face repository with pinned SHA-256, user confirms size) or cloud STT (OpenAI, Azure). Cloud uploads > 25 MB are split on silence into ≤ 10 min chunks with timestamp offsetting. Export `.srt` (`HH:MM:SS,mmm`) and `.txt` (`[HH:MM:SS] text`). Segments stored in `transcript_segments`; full text in `doc_text(kind=3)` → searchable. |
+| **GPU transcription** (decision D5, in scope for v1) | Optional runtime packs, **never bundled in the installer**, downloaded only after a consent dialog that shows the size, into `%LOCALAPPDATA%\NexPane\runtimes\whisper-<pack>\<version>\`. <br>**CUDA pack** (NVIDIA, ≈ 500 MB): Whisper.net's CUDA native library (from the `Whisper.net.Runtime.Cuda` package on nuget.org flat container, verified against the package's published SHA-512) plus NVIDIA CUDA 12 redistributables `cudart64_12.dll`, `cublas64_12.dll`, `cublasLt64_12.dll` (from NVIDIA's `developer.download.nvidia.com/compute/cuda/redist` archives, verified against the SHA-256 values in the matching `redistrib_<ver>.json` manifest). Requires an NVIDIA GPU, a driver reporting CUDA ≥ 12.0 (`cuDriverGetVersion` via `nvcuda.dll`) and ≥ 4 GB VRAM for `large-v3-turbo`. <br>**Vulkan pack** (AMD/Intel/NVIDIA, tens of MB): the `Whisper.net.Runtime.Vulkan` native library; needs `vulkan-1.dll` from the GPU driver. <br>**Detection:** DXGI adapter enumeration (vendor id, dedicated VRAM) + CUDA driver probe + Vulkan instance creation probe; results shown in Settings › Transcription with reasons when a pack is unavailable. <br>**Loading:** runtime order is user-selectable (default Auto = CUDA → Vulkan → CPU) and applied through Whisper.net's runtime options (library search order + custom native library path) before the first `WhisperFactory` is created; a load or initialization failure logs the reason and falls back to the next runtime, ending at CPU, and never crashes the app. The transcript panel shows which runtime was used. <br>**Integrity:** downloads resume via HTTP range requests; all files are hash-verified before being moved into place atomically; pinned versions and hashes live in `eng/third-party.lock.json` and are compiled into the app. Packs can be removed from Settings and are deleted by the uninstaller's "remove user data" option. |
 | **OCR** | `Windows.Media.Ocr.OcrEngine` (`TryCreateFromLanguage` / `TryCreateFromUserProfileLanguages`); images decoded through `BitmapDecoder` → `SoftwareBitmap` (Bgra8), downscaled to `OcrEngine.MaxImageDimension`; scanned PDFs rendered per page with Docnet (PDFium) at 200 DPI. Lines + bounding boxes → `ocr_lines`; text → `doc_text(kind=2)`. |
 | **Visual descriptions** | Vision-capable chat model with a fixed prompt ("objects, scene, visible text, 60 words"); image downscaled to ≤ 1 568 px long edge JPEG q85; stored as `doc_text(kind=4)` → searchable via `content:` and semantic. Batch mode requires explicit user start and shows estimated request count. |
 
@@ -1324,15 +1343,17 @@ Versions: latest stable at repo init, pinned in `Directory.Packages.props` (exce
 | OpenAI | AI | MIT | OpenAI, Azure OpenAI v1, OpenAI-compatible local |
 | Anthropic | AI | MIT | Official Anthropic C# SDK |
 | AWSSDK.BedrockRuntime, AWSSDK.Bedrock | AI | Apache-2.0 | Bedrock Converse/InvokeModel, model listing |
-| Whisper.net, Whisper.net.Runtime | AI | MIT (whisper.cpp MIT; Whisper weights MIT) | Local speech-to-text |
+| Whisper.net, Whisper.net.Runtime | AI | MIT (whisper.cpp MIT; Whisper weights MIT) | Local speech-to-text (CPU runtime shipped) |
+| Whisper.net.Runtime.Cuda, Whisper.net.Runtime.Vulkan (native libs) | AI (optional download) | MIT | GPU transcription packs, downloaded on demand (§13.2) — not package-referenced, not in the installer |
+| NVIDIA CUDA 12 runtime redistributables (cudart, cuBLAS, cuBLASLt) | AI (optional download) | NVIDIA CUDA EULA, redistributable components | Required by the CUDA pack; downloaded on demand with SHA-256 verification |
 | NAudio | AI | MIT | Media Foundation decode + resample to 16 kHz |
 | SkiaSharp, Svg.Skia | tools/AssetGen | MIT | SVG rasterization for icons/bitmaps |
 | **Tests** | | | |
-| xunit.v3, xunit.runner.visualstudio, Microsoft.NET.Test.Sdk | tests | Apache-2.0 / MIT | Test framework |
+| xunit.v3.mtp-v2 (xUnit v3 on Microsoft.Testing.Platform v2; selected via `global.json` `"test": {"runner": "Microsoft.Testing.Platform"}`) | tests | Apache-2.0 / MIT | Test framework and runner (no VSTest adapter) |
 | FluentAssertions **pinned `[7.2.0]`** | tests | Apache-2.0 | Assertions. **v8+ is under a paid commercial license (Xceed); do not upgrade.** Drop-in alternative: AwesomeAssertions (Apache-2.0 fork). |
 | NSubstitute | tests | BSD-3-Clause | Mocks (Moq avoided due to its 2023 SponsorLink incident) |
 | WireMock.Net | AI.Tests, Network.Tests | Apache-2.0 | HTTP provider stubs |
-| NetArchTest.Rules | Architecture.Tests | MIT | Dependency rule enforcement |
+| NetArchTest.Rules | Architecture.Tests | MIT | Type-level dependency rules, added in Phase 3 once modules contain types (project-level rules are already enforced by .csproj parsing, §4) |
 | FlaUI.UIA3 | UITests | MIT | UI automation E2E |
 | BenchmarkDotNet | Benchmarks | MIT | Performance budgets |
 | coverlet.collector | tests | MIT | Coverage |
@@ -1356,9 +1377,9 @@ Versions: latest stable at repo init, pinned in `Directory.Packages.props` (exce
 | Network | TLS 1.2+ only; FTPS cert validation + TOFU pin; SFTP TOFU host keys with hard fail on mismatch; WebDAV Basic only over HTTPS. |
 | DLL loading | `SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_APPLICATION_DIR)` at startup; native libs loaded by absolute path. |
 | Regex | NonBacktracking default; timeouts for backtracking fallback. |
-| Downloads | Whisper models: HTTPS, pinned SHA-256, user consent showing size; nothing else is downloaded at runtime. |
+| Downloads | Whisper models and GPU runtime packs (CUDA/Vulkan, §13.2): HTTPS only, hashes pinned in the app (SHA-256, or nuget.org package SHA-512), consent dialog showing size and publisher license, atomic move after verification, loaded by absolute path from `%LOCALAPPDATA%\NexPane\runtimes` (per-user ACL). Nothing else is downloaded at runtime. |
 | Telemetry | None. Crash logs stay local; "Copy diagnostics" button for users. |
-| Code signing | Authenticode signing of `NexPane.exe`, `NexPane.IndexService.exe`, and the installer when a certificate is available (open question, §20). |
+| Code signing | **Decision D2: v1 ships unsigned.** `eng/publish.ps1` contains an optional Authenticode step (`signtool sign /fd SHA256 /tr <RFC3161 URL> /td SHA256 /sha1 <thumbprint>`) that runs only when `NEXPANE_SIGN_CERT_THUMBPRINT` is set; by default it logs "signing skipped" and continues. Integrity of downloaded components relies on pinned SHA-256/SHA-512 hashes, not signatures. |
 
 ---
 
@@ -1399,7 +1420,8 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 | Network integration | FTP/FTPS/SFTP/WebDAV against real servers | Env-gated: `NEXPANE_IT_SFTP=host;user;credTarget` etc.; WireMock for WebDAV protocol shape | Nightly / pre-release |
 | AI contract | Each provider's request JSON and SSE parsing against recorded fixtures (WireMock); live smoke tests env-gated (`NEXPANE_IT_OPENAI_KEY_TARGET` naming a CredMan target, never the key itself) | WireMock.Net | Every PR (fixtures), pre-release (live) |
 | Elevated | USN/MFT against a VHDX created and mounted by the test (`New-VHD` + `Mount-VHD` requires Hyper-V module, fallback `diskpart` script) | xUnit, `[Trait("Category","Elevated")]` | Pre-release, run as admin |
-| Architecture | Layer rules §4 | NetArchTest | Every PR |
+| Architecture | Layer rules and repository conventions §4 | .csproj parsing (now), NetArchTest type rules (Phase 3) | Every PR |
+| Module build facts | Every module assembly is x64 and carries the §2 TargetFramework / TargetPlatform / SupportedOSPlatform attributes | `tests/Shared/ModuleAssembly.cs` (PEReader + attributes), one test per test project | Every PR |
 | Performance | §17 budgets with synthetic 1M/5M entry indexes | BenchmarkDotNet | Nightly + pre-release |
 | E2E UI | Launch, dual pane navigation, tabs, search-as-you-type, preview, context menu appears (UIA Menu element), batch rename preview/apply/undo, theme switch, session restore | FlaUI.UIA3 | Pre-release |
 | Installer | Silent install `/VERYSILENT /SUPPRESSMSGBOXES /DIR=...`, verify files, shortcuts, registry verbs, uninstall leaves no files except user data (by choice) | Pester-free PowerShell script `eng/test-installer.ps1` in a clean Windows Sandbox | Pre-release |
@@ -1418,13 +1440,14 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 
 ### 19.2 Build & publish
 - `dotnet build NexPane.sln -c Release`
-- `dotnet test NexPane.sln -c Release --filter "Category!=Elevated&Category!=Live"`
+- `dotnet test --solution NexPane.sln -c Release --filter-not-trait "Category=Elevated" --filter-not-trait "Category=Live"` (Microsoft.Testing.Platform runner; tests mark suites with `[Trait("Category", "Elevated")]` / `"Live"`)
 - `dotnet publish src/NexPane.App/NexPane.App.csproj -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=true -o build/publish/win-x64` (+ same for `NexPane.IndexService` into the same folder). **Not** single-file (native libs: e_sqlite3, 7z.dll, whisper, PDFium, WebView2Loader) and **not** trimmed (WPF is not trim-safe).
 
 ### 19.3 Installer (`installer/NexPane.iss`, Inno Setup 6)
-- `AppId={{23676795-F60E-4EAF-95C6-C4D81BAD01C1}` (fixed forever; changing it breaks upgrades), `ArchitecturesAllowed=x64compatible`, `ArchitecturesInstallIn64BitMode=x64compatible`, `MinVersion=10.0.17763`, `PrivilegesRequired=admin`, `PrivilegesRequiredOverridesAllowed=dialog` (per-user install possible, then the Index Service task is disabled), `LicenseFile=license.rtf`, `SetupIconFile=..\assets\icons\NexPane.ico`, `UninstallDisplayIcon={app}\NexPane.exe`, `WizardStyle=modern`, `OutputDir=..\dist`, `OutputBaseFilename=NexPane-Setup-{#AppVersion}`, `SolidCompression=yes`, `Compression=lzma2/ultra64`.
+- `AppId={{23676795-F60E-4EAF-95C6-C4D81BAD01C1}` (fixed forever; changing it breaks upgrades), `ArchitecturesAllowed=x64compatible`, `ArchitecturesInstallIn64BitMode=x64compatible`, `MinVersion=10.0.17763`, `PrivilegesRequired=admin`, `PrivilegesRequiredOverridesAllowed=dialog` (per-user install possible, then the Index Service task is disabled), `LicenseFile=..\LICENSE.txt` (proprietary EULA, decision D1; `THIRD-PARTY-NOTICES.txt` installed to `{app}`), no `SignTool` directive (decision D2: unsigned), `SetupIconFile=..\assets\icons\NexPane.ico`, `UninstallDisplayIcon={app}\NexPane.exe`, `WizardStyle=modern`, `OutputDir=..\dist`, `OutputBaseFilename=NexPane-Setup-{#AppVersion}`, `SolidCompression=yes`, `Compression=lzma2/ultra64`.
 - Pages: Welcome → License → Directory → Start Menu folder → Tasks → Ready → Install → Finish (launch option).
-- Tasks: `desktopicon`, `contextmenu` ("Add 'Open in NexPane' to Explorer context menu", checked), `indexservice` ("Install NexPane Index Service for fast NTFS indexing", admin mode only).
+- Tasks: `desktopicon`, `contextmenu` ("Add 'Open in NexPane' to Explorer context menu", checked; classic menu only — Windows 11 shows it under "Show more options", decision D2), `indexservice` ("Install NexPane Index Service for fast NTFS indexing", **checked by default** in admin installs per decision D3, hidden in per-user installs). The task description carries the privacy note: *"Runs as a background Windows service with administrator rights to read the NTFS change journal. File names are only shown to Windows users who are allowed to list the containing folder. Nothing leaves this computer."*
+- Uninstall "remove user data" also deletes `%LOCALAPPDATA%\NexPane\runtimes\` (GPU Whisper packs) and downloaded models.
 - Registry (`HKA` root → HKLM for admin, HKCU for per-user): `Software\Classes\Directory\shell\NexPane` (`(Default)=Open in NexPane`, `Icon={app}\NexPane.exe,0`, `command\(Default)="{app}\NexPane.exe" "%V"`), same for `Directory\Background\shell\NexPane` and `Drive\shell\NexPane`; all with `uninsdeletekey`.
 - Service: `[Run]` `sc.exe create NexPaneIndex binPath= "\"{app}\NexPane.IndexService.exe\"" start= delayed-auto obj= LocalSystem DisplayName= "NexPane Index Service"` then `sc.exe description` and `sc.exe start`; `[UninstallRun]` `sc.exe stop` + `sc.exe delete`.
 - WebView2: `[Code]` checks `HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}` `pv`; if missing, runs the bundled Evergreen Bootstrapper (`MicrosoftEdgeWebview2Setup.exe /silent /install`); failure is non-fatal (Markdown preview falls back to plain text).
@@ -1442,11 +1465,11 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 | R3 | Index service privacy | A SYSTEM service can see every file name. | `AccessCheck` filtering per directory against the client token; documented in the installer task description. |
 | R4 | RAR archives | RAR creation is license-restricted (RARLAB). | RAR/RAR5 are list/extract/test only (incl. encrypted). |
 | R5 | Authentic native context menu | `IContextMenu` yields the classic menu (equivalent to Windows 11 "Show more options"). Windows 11 modern-menu-only entries from packaged apps (`IExplorerCommand` via sparse packages) may be absent. Cross-folder multi-selection menus can omit some third-party handlers. Native menus follow system dark/light only via the undocumented `uxtheme` ordinal 135 `SetPreferredAppMode`; guarded by OS build check and a setting, no-op if unavailable. | Documented; tested on Win10 22H2 and Win11 24H2/25H2. |
-| R6 | "Open in NexPane" in Explorer | On Windows 11 classic registry verbs appear only under "Show more options"; the top-level modern menu requires package identity (sparse MSIX + `IExplorerCommand` COM server), which conflicts with the "unpackaged" decision. | Classic verbs in v1. Modern menu = open question Q4. |
+| R6 | "Open in NexPane" in Explorer | On Windows 11 classic registry verbs appear only under "Show more options"; the top-level modern menu requires package identity (sparse MSIX + `IExplorerCommand` COM server), which conflicts with the "unpackaged" decision. | **Decided (D2): classic verbs only; a Windows 11 top-level entry is out of scope for v1** (it would also require code signing, which is not available). |
 | R7 | Native preview handlers | Availability depends on installed handlers (e.g. Office preview requires Office). Some handlers crash or hang; some only support in-proc. Win32 child HWND cannot have WPF content drawn over it (airspace). | Out-of-proc first, crash sentinel/blocklist, built-in fallbacks (OpenXml text for .docx etc.), no WPF overlays over the preview area. |
 | R8 | Audio/video preview | WPF `MediaElement` uses Media Foundation: codecs depend on the OS (HEVC needs the paid Store extension; MKV/FLAC supported on Win10 1809+ through MF; no AV1 without the AV1 extension). | MediaElement in v1; unsupported formats show metadata + "Open externally". LibVLC rejected (license mix, size, airspace). |
 | R9 | OCR | `Windows.Media.Ocr` requires the OCR language capability installed per language; no handwriting; accuracy below commercial engines on low-quality scans. | Lists installed languages, links to Settings › Language to add more; quality noted in UI. |
-| R10 | Local transcription | Whisper on CPU: `base` ≈ 5–10× real-time on the reference machine, `large-v3-turbo` ≈ 0.5–1× real-time; models 75 MB–1.6 GB downloaded separately. | Model picker with size/speed hints; GPU runtime (CUDA/Vulkan) optional future add-on; cloud STT available. |
+| R10 | Local transcription | Whisper on CPU: `base` ≈ 5–10× real-time on the reference machine, `large-v3-turbo` ≈ 0.5–1× real-time; models 75 MB–1.6 GB downloaded separately. | Model picker with size/speed hints; cloud STT available. **GPU transcription is in scope for v1 (decision D5)** via optional CUDA (≈ 500 MB) and Vulkan packs (§13.2). Remaining limits: CUDA needs an NVIDIA GPU with a CUDA 12-capable driver; Vulkan speed varies by driver; very old GPUs and systems with < 4 GB VRAM fall back to CPU or smaller models. |
 | R11 | Semantic search with Claude | Anthropic offers no embeddings API. | Semantic search requires an embedding-capable provider (OpenAI, Azure, Gemini, Bedrock, or local Ollama/LM Studio); UI explains this when Claude is the only provider. |
 | R12 | Vector index scale | Brute-force is exact but O(n). | int8 quantization above 250k chunks; HNSW behind `IVectorIndex` if needed. |
 | R13 | Remote SHA-256 compare | Requires reading the whole remote file (except SFTP with shell `sha256sum`). | Warn with estimated bytes before hashing remote trees. |
@@ -1455,20 +1478,22 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 | R16 | Long paths | .NET handles `\\?\` paths, but many shell APIs (PIDLs, IContextMenu, preview handlers, ShellExecuteEx) are limited to `MAX_PATH`. | `longPathAware` manifest; file ops through Win32 `\\?\` fallback when IFileOperation fails; context menu for > 260-char paths falls back to NexPane's built-in menu with a notice. |
 | R17 | Memory at extreme scale | 10M entries ≈ 1.6 GB RAM. | Per-volume include/exclude; warning when projected index > 25 % of physical RAM. |
 | R18 | Installer size | Self-contained .NET + WPF + native libs ≈ 180–230 MB installed, ≈ 70–90 MB installer. Whisper models not bundled. | Accepted. |
-| R19 | SmartScreen | Unsigned installers trigger SmartScreen "unrecognized app". | Code signing certificate needed (Q2). |
+| R19 | SmartScreen / unsigned binaries | **Decision D2: v1 ships unsigned.** Windows SmartScreen shows "Windows protected your PC / Unknown publisher" for `NexPane-Setup.exe` until reputation builds (users must click "More info → Run anyway"); UAC shows "Unknown publisher"; some enterprise policies (WDAC/AppLocker publisher rules) and antivirus heuristics may block unsigned binaries. | Documented in release notes and on the download page; optional signing step in `eng/publish.ps1` can be enabled later without code changes. |
 | R20 | FluentAssertions licensing | v8+ requires a paid license for commercial use. | Pinned 7.2.0 (Apache-2.0). |
 | R21 | LGPL components | TagLibSharp, SevenZipSharp, 7z.dll | Dynamically linked, unmodified, license texts + source links shipped in THIRD-PARTY-NOTICES; user can replace the DLLs. |
 | R22 | Jint performance | ~10–50× slower than V8 for CPU-bound JS. | Acceptable for event/rename/routing scripts; statement and time limits protect UX. |
 | R23 | WebView2 dependency | Not guaranteed present on Windows 10. | Installer bootstrapper; plain-text fallback. |
-| R24 | Default file manager (Win+E / folder open replacement) | Not in requested scope; requires hijacking `Folder\shell` defaults, fragile across updates. | Out of scope for v1 (Q5). |
+| R24 | Default file manager (Win+E / folder open replacement) | Not in requested scope; requires hijacking `Folder\shell` defaults, fragile across updates. | **Decided (D4): out of scope for v1.** |
 
-### Open questions for the user
-- **Q1** NexPane's own license (affects installer license page text and LGPL notice wording). Proposed default: proprietary EULA © Ewais, or MIT if open source.
-- **Q2** Authenticode code-signing certificate available? (SmartScreen, service binary trust.)
-- **Q3** Should the Index Service task be checked by default in admin installs? (Proposed: checked, with privacy note.)
-- **Q4** Windows 11 top-level context menu entry via sparse package + `IExplorerCommand` (adds a signed MSIX sparse package; requires Q2).
-- **Q5** "Replace Explorer as default folder handler" option — in or out for v1? (Proposed: out.)
-- **Q6** Whisper GPU acceleration (CUDA runtime ≈ +500 MB) — ship as optional download later or never?
+### User decisions (answered 2026-10-21; formerly open questions Q1–Q6)
+
+| Id | Question | Decision |
+|---|---|---|
+| D1 (Q1) | NexPane's own license | **Proprietary EULA, all rights reserved**, copyright holder "NexPane", 2026. `LICENSE.txt` is the installer license page; `THIRD-PARTY-NOTICES.txt` lists every §15 dependency and its license. |
+| D2 (Q2, Q4) | Code signing; Windows 11 top-level menu | **No code signing — ship unsigned** (R19). Signing stays an optional, skipped build step. **Windows 11 top-level context-menu entry is out of scope**; classic "Show more options" menu only (R6). |
+| D3 (Q3) | Index Service task default | **Checked by default for admin installs**, with the privacy note in §19.3. |
+| D4 (Q5) | Replace Explorer as default folder handler | **Out of scope for v1** (R24). |
+| D5 (Q6) | GPU Whisper | **In scope for v1** as optional downloads (CUDA ≈ 500 MB, Vulkan) — §13.2, TODO P6.26–P6.30. |
 
 ---
 
@@ -1488,6 +1513,14 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 | 2026-10-21 | FluentAssertions pinned 7.2.0 | v8 commercial license |
 | 2026-10-21 | Markdown via Markdig → WebView2 (scripts off) | Rendering fidelity; plain-text fallback |
 | 2026-10-21 | Installer AppId `{23676795-F60E-4EAF-95C6-C4D81BAD01C1}` | Stable upgrade identity |
+| 2026-10-21 | SDK pinned `10.0.402` (`rollForward: latestFeature`); classic `NexPane.sln` format (`dotnet new sln --format sln`, since .NET 10 defaults to `.slnx`) | Matches installed toolchain; tooling compatibility |
+| 2026-10-21 | Test runner: xUnit v3 on Microsoft.Testing.Platform (`xunit.v3.mtp-v2` 4.0.2, `global.json` `test.runner`); trait filters replace VSTest `--filter` | Template default for .NET 10; faster, no VSTest adapter |
+| 2026-10-21 | Layering enforced by .csproj parsing now; NetArchTest type rules deferred to Phase 3 | Empty assemblies carry no type dependencies to inspect |
+| 2026-10-21 | Added `tests/NexPane.IndexService.Tests` and `tests/Shared/ModuleAssembly.cs`; every test project has ≥ 1 real test (MTP fails zero-test assemblies) | Verifiable host lifetime; per-module x64/TFM checks |
+| 2026-10-21 | `tools/NexPane.AssetGen` created in P2.02, not at init | Zero-placeholder rule: no empty console program |
+| 2026-10-21 | App `AssemblyName=NexPane` (→ `NexPane.exe`); `RuntimeIdentifier=win-x64` only on App and IndexService; `PlatformTarget=x64` globally; NuGet audit warnings NU1901–NU1904 not promoted to errors | Installer/registry paths use `NexPane.exe`; avoid RID-specific outputs for libraries; audit findings are release blockers in P7.04 instead of breaking local builds |
+| 2026-10-21 | D1–D5 user decisions (§20) | Recorded from user answers |
+| 2026-10-21 | GPU Whisper via on-demand CUDA/Vulkan packs with hash-pinned downloads, CPU fallback | D5; keeps installer size unchanged |
 
 ---
 
@@ -1521,6 +1554,7 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 | C. NL → query assistant | §13.2 | P6.15 |
 | C. Summarize / Translate / Prepare-a-Reply | §13.2 | P6.16, P6.17 |
 | C. Transcription with .srt/.txt export | §13.2, R10 | P6.18–P6.21 |
+| C. GPU Whisper (decision D5) | §13.2, §16, R10 | P6.26–P6.30 |
 | C. OCR (images, scanned PDFs) + visual descriptions indexed | §13.2, R9 | P6.22, P6.23 |
 | D. SVG logo → multi-res ICO, wizard bitmaps | §19.1 | P2.01–P2.08 |
-| E. Inno Setup installer (license, dir, shortcuts, Explorer verbs, uninstaller, self-contained) | §19.2, §19.3, R6 | P7.07–P7.11 |
+| E. Inno Setup installer (license, dir, shortcuts, Explorer verbs, uninstaller, self-contained) | §19.2, §19.3, R6, R19 | P1.13, P7.07–P7.11 |

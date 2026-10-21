@@ -9,7 +9,9 @@ NexPane is an AI-powered file explorer for Windows 10 (1809+) and Windows 11, bu
 - Power tools: archives as virtual folders (RAR is extract-only), folder compare/sync, batch renamer with undo, a metadata editor, JavaScript scripting, and SMB/FTP/FTPS/SFTP/WebDAV browsing.
 - AI with your choice of provider (Azure AI Foundry, Gemini, Claude, OpenAI, AWS Bedrock, LM Studio/Ollama): semantic search, natural-language queries, summarize/translate/reply drafts, transcription, OCR, and image descriptions.
 
-**Status:** Phase 1 (architecture). No application code yet.
+**Status:** Phase 1 (architecture + solution skeleton). The solution builds and tests pass; no features implemented yet.
+
+**License:** Proprietary — see [LICENSE.txt](LICENSE.txt). Third-party components: [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
 ## Documentation
 
@@ -20,9 +22,11 @@ NexPane is an AI-powered file explorer for Windows 10 (1809+) and Windows 11, bu
 | [docs/handoff/TODO.md](docs/handoff/TODO.md) | Phase-by-phase checklist with owners and acceptance tests |
 | [docs/handoff/ARCHITECTURE.md](docs/handoff/ARCHITECTURE.md) | Full technical design |
 
-## Quick build (once the solution exists)
+## Quick build
+
+Requires the .NET 10 SDK (10.0.402 or a later 10.0 feature band).
 
 ```powershell
 dotnet build NexPane.sln -c Release
-dotnet test NexPane.sln -c Release --filter "Category!=Elevated&Category!=Live"
+dotnet test --solution NexPane.sln -c Release --filter-not-trait "Category=Elevated" --filter-not-trait "Category=Live"
 ```
