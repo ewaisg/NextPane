@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Restores, builds and tests NexPane (TODO P1.11, ARCHITECTURE section 19.2).
+    Restores, builds and tests NexPane (task P1.11, ARCHITECTURE section 19.2).
 
 .DESCRIPTION
     1. dotnet restore NexPane.sln

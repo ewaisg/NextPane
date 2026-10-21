@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Compiles installer\NexPane.iss with Inno Setup 6 into dist\NexPane-Setup.exe
-    (TODO P1.11 / P7.08, ARCHITECTURE section 19.3).
+    (tasks P1.11 / P7.08, ARCHITECTURE section 19.3).
 
 .DESCRIPTION
     - Locates ISCC.exe (per-user install first, then Program Files (x86), then Program Files, then PATH).

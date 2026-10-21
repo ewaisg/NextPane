@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Publishes NexPane (App + IndexService) self-contained for win-x64 into one folder (TODO P1.11 / P7.07, ARCHITECTURE section 19.2).
+    Publishes NexPane (App + IndexService) self-contained for win-x64 into one folder (tasks P1.11 / P7.07, ARCHITECTURE section 19.2).
 
 .DESCRIPTION
     - Deletes the output folder (default build\publish\win-x64) so no stale files reach the installer.

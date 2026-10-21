@@ -1,32 +1,45 @@
 # ---------------------------------------------------------------
 # NexPane .gitignore — .NET / Visual Studio / Rider / VS Code
-# NOTE: Branding assets (assets/**/*.ico, *.png, *.bmp, *.svg) are
-# COMMITTED on purpose. Do not add image or icon patterns here.
+#
+# Rules for editing this file (P1.07, QA 2026-10-21):
+#  * Every directory pattern is ANCHORED (leading "/") or scoped to a
+#    project folder, so source folders such as Models/, Secrets/,
+#    Packages/, Log/ or Logs/ under src/, tests/ or tools/ are never
+#    ignored (core.ignorecase=true makes unanchored patterns match any case).
+#  * Branding assets (assets/**/*.ico, *.png, *.bmp, *.svg) are COMMITTED.
+#  * Test fixtures under tests/TestAssets/ are always committed (see end).
+#  * Verify changes with: git check-ignore -v <path>   and   git status --ignored
 # ---------------------------------------------------------------
 
-# Project output folders
+# Build / package output folders at the repository root
 /build/
 /dist/
+/artifacts/
+/packages/
+/PublishScripts/
+/installer/Output/
+/*.log
+/*.binlog
 
-# .NET build output
-[Bb]in/
-[Oo]bj/
-[Ll]og/
-[Ll]ogs/
-artifacts/
-*.nupkg
-*.snupkg
-project.lock.json
-project.fragment.lock.json
+# Per-project build output (src/<Project>/bin, tests/<Project>/obj, ...)
+/src/*/[Bb]in/
+/src/*/[Oo]bj/
+/tests/*/[Bb]in/
+/tests/*/[Oo]bj/
+/tools/*/[Bb]in/
+/tools/*/[Oo]bj/
 
 # Test / coverage / benchmark results
-[Tt]est[Rr]esult*/
+/[Tt]est[Rr]esults/
+/tests/*/[Tt]est[Rr]esults/
+/tests/**/TestOutput/
+/coverage/
+/coverage*.json
+/coverage*.xml
+/coverage*.info
 *.trx
 *.coverage
 *.coveragexml
-coverage*.json
-coverage*.xml
-coverage*.info
 BenchmarkDotNet.Artifacts/
 
 # Visual Studio
@@ -50,41 +63,34 @@ _ReSharper*/
 *.DotSettings.user
 
 # VS Code
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+/.vscode/*
+!/.vscode/settings.json
+!/.vscode/tasks.json
+!/.vscode/launch.json
+!/.vscode/extensions.json
 
-# NuGet
-packages/
-!**/[Pp]ackages/build/
+# NuGet generated files (restore output lives in obj/)
 *.nuget.props
 *.nuget.targets
+*.nupkg
+*.snupkg
 
-# Publish profiles output
-PublishScripts/
-*.pubxml.user
-
-# Inno Setup compiler output (installer lands in /dist/)
-installer/Output/
-
-# Local secrets / environment (never commit)
-*.env
-.env.*
-secrets/
+# Local secrets / environment / signing material (never commit)
+/secrets/
+/.env
+/.env.*
 *.pfx
 *.p12
 *.snk.private
 
-# Local test data generated at runtime
-tests/**/TestOutput/
-*.vhdx
-
-# Whisper / AI models downloaded locally
-models/
+# Locally downloaded AI models and GPU runtime packs (never commit)
+/models/
+/runtimes/
 *.ggml
 *.gguf
+
+# Local disk images created by elevated tests
+*.vhdx
 
 # OS junk
 Thumbs.db
@@ -93,8 +99,13 @@ Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
 
-# Editor temp
+# Editor temp files
 *~
 *.swp
 *.tmp
 *.bak
+
+# Test fixtures are always tracked, even if a pattern above matches them
+# (e.g. a fixture .bak, .tmp, .pfx, Desktop.ini or a folder named bin).
+!/tests/TestAssets/
+!/tests/TestAssets/**

@@ -18,9 +18,14 @@ Status legend:  [shipped]   included in the current build output
 1. RUNTIME AND HOSTING
 ----------------------
 .NET 10 Runtime, Windows Desktop Runtime (WPF)      MIT                     https://github.com/dotnet/runtime, https://github.com/dotnet/wpf          [shipped]
-Microsoft.Extensions.Hosting.WindowsServices (and   MIT                     https://github.com/dotnet/runtime                                         [shipped]
-  Microsoft.Extensions.Hosting / DependencyInjection /
-  Logging / Options / Configuration dependencies)
+Microsoft.Extensions.Hosting.WindowsServices       MIT                     https://github.com/dotnet/runtime                                         [shipped]
+Microsoft.Extensions.Hosting                       MIT                     https://github.com/dotnet/runtime                                         [shipped]
+Microsoft.Extensions.DependencyInjection           MIT                     https://github.com/dotnet/runtime                                         [shipped]
+Microsoft.Extensions.Logging                       MIT                     https://github.com/dotnet/runtime                                         [shipped]
+Microsoft.Extensions.Options                       MIT                     https://github.com/dotnet/runtime                                         [shipped]
+Microsoft.Extensions.Configuration.Json            MIT                     https://github.com/dotnet/runtime                                         [shipped]
+Windows SDK projection (Microsoft.Windows.SDK.NET, MIT                    https://github.com/microsoft/CsWinRT                                      [shipped]
+  C#/WinRT; Windows.Security.Credentials.PasswordVault, Windows.Media.Ocr)
 Microsoft.Extensions.Http.Resilience               MIT                     https://github.com/dotnet/extensions                                      [planned]
 Serilog                                            Apache-2.0              https://github.com/serilog/serilog                                        [planned]
 Serilog.Extensions.Hosting                         Apache-2.0              https://github.com/serilog/serilog-extensions-hosting                     [planned]
@@ -106,4 +111,5 @@ BenchmarkDotNet                                    MIT                     https
 NSubstitute                                        BSD-3-Clause            https://github.com/nsubstitute/NSubstitute                                [dev]
 WireMock.Net                                       Apache-2.0              https://github.com/WireMock-Net/WireMock.Net                              [dev]
 FlaUI.UIA3                                         MIT                     https://github.com/FlaUI/FlaUI                                            [dev]
+NetArchTest.Rules                                  MIT                     https://github.com/BenMorris/NetArchTest                                  [dev]
 coverlet.collector                                 MIT                     https://github.com/coverlet-coverage/coverlet                             [dev]

@@ -1,17 +1,26 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-21 (d) by the QA Inspector (S7 QA role): Phase 1 audit + P1.12 placeholder scanner.
+> Last update: 2026-10-21 (e) by Subagent 1 (Lead Architect & State Scribe): QA-rejection fixes (P1.02, P1.07, P1.08, P1.13), P1.14 credential-store decision, roster renumbered to the user-mandated numbering (§8).
 
 ## 1. Executive summary
 
 NexPane is a production-grade, AI-powered Windows file explorer: C# / **.NET 10 LTS** / **WPF**, x64, unpackaged, Windows 10 1809+ and Windows 11, Inno Setup 6 installer, **proprietary license, shipped unsigned**.
 
-Phase 1 is complete up to QA. The toolchain is installed. The git repository (`main`) and `NexPane.sln` exist, with 15 `src` projects layered per ARCHITECTURE §4, 16 xUnit v3 test projects and a benchmarks runner. The solution builds with 0 warnings and 0 errors, and 47 of 47 tests pass. The app opens an empty window titled "NexPane". The IndexService is a Windows-service host skeleton that starts and stops cleanly. No feature code exists yet.
+Phase 1 is complete up to QA. The toolchain is installed. The git repository (`main`) and `NexPane.sln` exist, with 15 `src` projects layered per ARCHITECTURE §4, 16 xUnit v3 test projects and a benchmarks runner. The solution builds with 0 warnings and 0 errors, and 80 of 80 tests pass with the default filter. The app opens an empty window titled "NexPane". The IndexService is a Windows-service host skeleton that starts and stops cleanly. No feature code exists yet.
 
 The build → test → publish → installer pipeline (P1.11) is scripted in `eng\` and verified end-to-end. The placeholder scanner (P1.12) is in place and runs inside the default test suite (now 80 tests).
 
-**QA audit (2026-10-21): Phase 1 is NOT complete.** P1.01, P1.03–P1.06, P1.09–P1.12 are `[VERIFIED_COMPLETE]`; P1.02, P1.07, P1.08 and P1.13 were rejected back to S1 (defects inline in TODO.md), and P1.14 was added. Fix P1.07 (`.gitignore` swallows `Models/`, `Secrets/`, `Packages/`, `Log(s)/` folders) **before** Phase 2 (S2) and Phase 3 (S3) start in parallel.
+**Phase 1 status:**
+- `[VERIFIED_COMPLETE]`: P1.01, P1.03–P1.06, P1.09–P1.12.
+- `[READY_FOR_QA]` after S1's fixes, waiting for S6 to re-run:
+  - P1.02 (ARCHITECTURE defects; all 6 Mermaid blocks render);
+  - P1.07 (`.gitignore` anchored);
+  - P1.08 (full §22 traceability);
+  - P1.13 (notices);
+  - P1.14 (Credential Locker decision).
+
+Phase 2 (S7, branding) and Phase 3 (S2, core systems) can start in parallel now.
 
 ## 2. Files currently being worked on
 
@@ -25,8 +34,9 @@ The build → test → publish → installer pipeline (P1.11) is scripted in `en
 | `tests/Shared/ModuleAssembly.cs` | Shared helper linked into every `*Tests` project (x64 / target framework assertions) |
 | `eng/common.ps1`, `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss` | Complete, `[READY_FOR_QA]` (P1.11); pipeline verified end-to-end → `dist\NexPane-Setup.exe` (52.8 MB). The `.iss` still needs the WebView2 bootstrapper and real branding in P7.08 |
 | `eng/check-placeholders.ps1`, `eng/placeholder-allowlist.json`, `tests/NexPane.Architecture.Tests/PlaceholderScannerTests.cs` | `[VERIFIED_COMPLETE]` (P1.12). QA owns the allowlist |
-| `.gitignore`, `ARCHITECTURE.md` (§2, §19.3, header, §22), `THIRD-PARTY-NOTICES.txt` | `[IN_PROGRESS]` — QA rejections P1.07, P1.02/P1.08, P1.13 (S1) |
-| Next up | S1: P1.07 → P1.13 → P1.02/P1.08 → P1.14; then S2 Phase 2 and S3 Phase 3 in parallel |
+| `.gitignore`, `ARCHITECTURE.md` (header, §2, §3, §9.2, §10.3, §12.6, §14, §16, §18, §19.3, §20 R7/R17, §21, §22), `THIRD-PARTY-NOTICES.txt` | `[READY_FOR_QA]`: P1.07, P1.02, P1.08, P1.13 and P1.14 fixes by S1 (2026-10-21 e) |
+| `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss`, `eng/placeholder-allowlist.json` | Cross-references reworded to "task(s) P1.11"; the allowlist is empty; scanner exit 0 |
+| Next up | S6: re-run the five READY_FOR_QA items. S7: Phase 2 (P2.01, P2.02). S2: Phase 3 (P3.01, P3.03) |
 
 ## 3. Environment setup
 
@@ -63,7 +73,7 @@ Initialization is done (commit `c6b4d4f`). The repo was scaffolded by hand rathe
 3. Classify every new `src` project in `tests/NexPane.Architecture.Tests/LayeringRules.cs` and in ARCHITECTURE §3/§4. Unclassified projects fail `Every_layer_project_exists_under_src`.
 4. Test projects must be named `*Tests`. `tests/Directory.Build.props` then makes them xUnit v3 MTP executables with FluentAssertions and the shared helper. Each test project must contain at least one test, because Microsoft.Testing.Platform fails an assembly with zero tests (exit code 8).
 5. Add the project to the solution: `dotnet sln NexPane.sln add <csproj> --solution-folder src|tests|tools`.
-6. `tools/NexPane.AssetGen` does not exist yet; S2 creates it in P2.02.
+6. `tools/NexPane.AssetGen` does not exist yet; S7 (Release & Installer Packaging, which owns branding) creates it in P2.02.
 
 ## 5. Build, test, publish, installer commands
 
@@ -126,7 +136,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
 9. **ReadDirectoryChangesW buffers.** The maximum over SMB is 64 KB. Treat `ERROR_NOTIFY_ENUM_DIR` and zero-byte completions as an overflow and rewalk the subtree.
 10. **Single writer** for the in-memory index and for each SQLite DB. Readers use immutable generations (index) and WAL (SQLite).
 11. **Regex from users** uses `RegexOptions.NonBacktracking`; fall back to backtracking only with a timeout.
-12. **Secrets** go only through `ICredentialStore` (CredMan; blobs over 2,560 bytes overflow to DPAPI). Never put them in settings.json, app.db, logs or URLs. The Gemini key goes in the `x-goog-api-key` header, never in a query string.
+12. **Secrets** go only through `ICredentialStoreProvider` (decision P1.14, ARCHITECTURE §10.3):
+    - **Network credentials** → `For(CredentialArea.Network)` = **Windows Credential Locker** (`Windows.Security.Credentials.PasswordVault`, resource `NexPane:net`, userName = connection_id).
+    - **AI keys** → `For(CredentialArea.Ai)` = **Credential Manager** generic credentials (`NexPane:ai:<providerId>:<field>`; blobs over 2,560 bytes overflow to DPAPI files).
+    - Never put secrets in settings.json, app.db, logs or URLs.
+    - Never swallow a `PasswordVault.Add` exception (Microsoft documents a per-app limit; it was not enforced for unpackaged apps in a test on 2026-10-21).
+    - Tests use test-only resource/target prefixes and clean up. The Gemini key goes in the `x-goog-api-key` header, never in a query string.
 13. **No trimming or single-file publish.** Do not enable `PublishTrimmed` or `PublishSingleFile`; an architecture test checks this.
 14. **FluentAssertions** is pinned to `7.2.0` (v8+ is commercially licensed); a test checks the pin. In v7, `OnlyContain` **fails on empty collections**, so use `NotContain(x => !predicate)` for "all items satisfy" checks.
 15. **Archives:** never offer RAR creation, always apply zip-slip checks, and extract to a per-user ACL'd temp folder.
@@ -136,12 +151,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
 19. **Analyzers:** `AnalysisLevel=latest-recommended` with warnings as errors. CA2007 (`ConfigureAwait`) is enforced in libraries but disabled in `NexPane.App` and in tests. Executable types should be `internal`; WPF XAML uses `x:ClassModifier="internal"`.
 20. **GPU Whisper** runtimes (CUDA and Vulkan) are optional downloads into `%LOCALAPPDATA%\NexPane\runtimes\`. They are never bundled in the installer, and loading must always fall back to CPU without crashing (ARCHITECTURE §13.2).
 21. **Inno Setup 6.7.3** is installed. ISPP `RemoveBackslash` is deprecated (it causes a warning, which fails `eng/installer.ps1`), so use `RemoveBackslashUnlessRoot`. Language-specific custom messages use a dot (`english.Name=`), not a colon. ISCC writes compile errors to stderr. Index Service setup lives in the `.iss` `[Code]` section (ARCHITECTURE §21), not in `[Run]`.
-22. **`.gitignore` pitfall (QA, P1.07 open):** the repo has `core.ignorecase=true` and unanchored `models/`, `secrets/`, `packages/`, `[Ll]og(s)/` patterns, so a folder like `src/NexPane.Core/Models/` is silently ignored. Until P1.07 is fixed, run `git status --ignored` after adding folders. Long scratch paths (> 260 chars, e.g. the agent scratchpad) make `dotnet` fail with "The directory name is invalid"; use a short `%TEMP%\...` folder for throwaway projects.
+22. **`.gitignore` rule (P1.07 fix):** the repo has `core.ignorecase=true`, so every directory pattern must be anchored (`/models/`) or scoped to a project folder (`/src/*/[Bb]in/`). Never add an unanchored folder pattern. `tests/TestAssets/**` is always re-included. Check new patterns with `git check-ignore -v <path>` and `git status --ignored`. With `-v`, a negation match (`!…`) also exits 0, so use `git check-ignore -q` (exit 1 = not ignored) to test. Long scratch paths (> 260 chars, e.g. the agent scratchpad) make `dotnet` fail with "The directory name is invalid"; use a short `%TEMP%\...` folder for throwaway projects.
 
 ## 7. Working rules
 
 - **Zero-placeholder rule.** No `TODO`/`FIXME`/`NotImplementedException`, stub returns, fake data, lorem ipsum or commented-out features in `src/`, and do not write the word "TODO" in source comments (use "task P3.13" instead). If something cannot be done, mark the TODO item `[BLOCKED]` with the reason; do not ship a stub. **Enforced** by `eng/check-placeholders.ps1` (P1.12) over `src/`, `tools/`, `installer/`, `eng/` — run it directly, or it fails `Repository_has_no_placeholders_stubs_or_fake_work` in the default test suite. Rules PH001–PH008 (markers, NotImplementedException, placeholder text, message-less `NotSupportedException()`, empty/comment-only catch, `Task.Delay`/`Thread.Sleep` in non-test C#, Console/Debug-only event handlers, mock/fake/dummy/stub/sample data). A legitimate hit (e.g. retry backoff `Task.Delay`) needs an entry in `eng/placeholder-allowlist.json` (path + rule + ≥ 10-char literal line fragment + ≥ 20-char justification), added by QA; stale entries fail the scan (exit 2). Test code under `tests/` is not scanned.
-- **Status discipline.** Owners move items `[PENDING] → [IN_PROGRESS] → [READY_FOR_QA]` (or `[BLOCKED]`). **Only Subagent 7 (QA) sets `[VERIFIED_COMPLETE]`.**
+- **Status discipline.** Owners move items `[PENDING] → [IN_PROGRESS] → [READY_FOR_QA]` (or `[BLOCKED]`). **Only Subagent 6 (QA, Verification & Security Inspector, veto power) sets `[VERIFIED_COMPLETE]`.**
 - **Session-end rule.** **No subagent ends a session without updating `STATE.md` (snapshot, just finished, active work, issues, exact next commands, session log), `TODO.md` (status tags) and `HANDOFF.md` (files being worked on, new gotchas).**
 - **Commits.** Commit at the end of each work item with a descriptive message ending in `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. No remote, no push.
 - **Architecture changes** require a row in the ARCHITECTURE §21 Decision Log and, if a requirement is affected, a Risks entry in §20.
@@ -152,14 +167,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
 
 | Id | Role | Owns |
 |---|---|---|
-| S1 | Lead Architect & State Scribe | Phase 1; ARCHITECTURE/TODO/STATE/HANDOFF stewardship; architecture tests; eng scripts |
-| S2 | Branding & Asset Engineer | Phase 2: logo SVGs, AssetGen, ICO/PNG/BMP, theme palette |
-| S3 | Core FS, Indexing & Search Engineer | Phase 3: VFS core, storage, in-memory index, USN/MFT/service, walker, watchers, crawler, query language, content index |
-| S4 | Shell UI & Native Integration Engineer | Phase 4: WPF shell, panes/tabs, search UI, native context menu, IFileOperation, drag/drop, preview, customization |
-| S5 | Power Tools Engineer | Phase 5: archives, compare/sync, batch rename, metadata, scripting, network VFS |
-| S6 | AI Integration Engineer | Phase 6: credentials, providers, semantic search, NL→query, summarize/translate/reply, transcription (CPU + GPU), OCR, descriptions |
-| S7 | QA Auditor & Release Engineer | Verifies every phase; Phase 7 audit, publish, installer, release notes |
+| S1 | Lead Architect & State Scribe | Phase 1; ARCHITECTURE/TODO/STATE/HANDOFF stewardship; architecture tests (P1.10, P3.37) |
+| S2 | Core Systems & Indexing Engine Engineer | Phase 3: VFS core, storage, in-memory index, USN/MFT + Index Service, walker, watchers, crawler, query language + regex search, content index. Phase 5 engines: archives, sync/compare, batch-rename engine, scripting engine, network clients (SMB/FTP/SFTP/WebDAV), transfers |
+| S3 | Native Windows Shell & OS Integration Engineer | Context menus, IFileOperation, ShellExecuteEx, drag/drop + clipboard, thumbnails, native preview-handler hosting, manifest/DPI/process hardening (P4.42), Explorer "Open in NexPane", property-system/ADS metadata providers, credential stores (Credential Locker, Credential Manager, DPAPI; P6.01), `--purge-user-data` (P4.43) |
+| S4 | AI & Semantic Pipeline Engineer | Phase 6: providers, embeddings/vector index, semantic search, NL→query, summarize/translate/reply, transcription (CPU + GPU), OCR, visual descriptions |
+| S5 | UI/UX & Workspace Engineer | Phase 4 UI: shell window, panes/tabs, search UI + filter builder, built-in previews, themes, docking, toolbars, shortcuts, settings window; dialogs and panels for Phase 5/6 features |
+| S6 | QA, Verification & Security Inspector (**veto power**) | Verifies every phase (P2.09, P3.36, P4.39, P5.34, P6.25); Phase 7 audits P7.01–P7.05; sole owner of `[VERIFIED_COMPLETE]`; owns the placeholder allowlist |
+| S7 | Release & Installer Packaging Engineer | **Phase 2 branding/icons/assets** (P2.01–P2.08); eng pipeline, publish, installer, notices, signing step, release notes, uninstall data removal (P7.06–P7.12, P7.14) |
 | ORC | Orchestrator | Toolchain, scheduling subagents |
+
+Renumbered 2026-10-21 at the user's mandate, by role. Mapping: old S2 → S7; old S3 → S2; old S4 → S3 / S5; old S5 → S2 / S3 / S5; old S6 → S4; old S7 → S6 / S7. Log entries written before this change use the old numbers.
 
 ## 9. User decisions (recorded 2026-10-21, ARCHITECTURE §20)
 
@@ -170,3 +187,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
 | D3 | Index Service installer task is **checked by default** for admin installs, with a privacy note. |
 | D4 | Replacing Explorer as the default folder handler is **out of scope** for v1. |
 | D5 | GPU Whisper (optional download of roughly 500 MB) is **in scope** for v1 (TODO P6.26–P6.30). |
+| P1.14 | Network credentials → **Windows Credential Locker** (`PasswordVault`); AI keys → **DPAPI / Credential Manager**. Uninstall "remove user data" (default No) purges both stores plus `%LOCALAPPDATA%\NexPane` and `%APPDATA%\NexPane` for the installing user via `NexPane.exe --purge-user-data` (P4.43, P7.14). |

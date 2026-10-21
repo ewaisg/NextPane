@@ -1,33 +1,4 @@
 {
   "_comment": "Allowlist for eng/check-placeholders.ps1 (TODO.md P1.12). Keep it narrow: one rule, one file, a literal line fragment (>= 10 chars) and a justification (>= 20 chars) per entry. Stale entries fail the scan. Only QA adds entries; owners remove them when the line is reworded.",
-  "entries": [
-    {
-      "path": "eng/build.ps1",
-      "rule": "PH001",
-      "match": "(TODO P1.11, ARCHITECTURE section 19.2)",
-      "justification": "Cross-reference to work item P1.11 in docs/handoff/TODO.md, not a pending-work marker. Owner rewords it to 'task P1.11' (HANDOFF section 7) and deletes this entry.",
-      "owner": "S1"
-    },
-    {
-      "path": "eng/publish.ps1",
-      "rule": "PH001",
-      "match": "(TODO P1.11 / P7.07, ARCHITECTURE section 19.2)",
-      "justification": "Cross-reference to work items P1.11/P7.07 in docs/handoff/TODO.md, not a pending-work marker. Owner rewords it to 'tasks P1.11 / P7.07' and deletes this entry.",
-      "owner": "S1"
-    },
-    {
-      "path": "eng/installer.ps1",
-      "rule": "PH001",
-      "match": "(TODO P1.11 / P7.08, ARCHITECTURE section 19.3)",
-      "justification": "Cross-reference to work items P1.11/P7.08 in docs/handoff/TODO.md, not a pending-work marker. Owner rewords it to 'tasks P1.11 / P7.08' and deletes this entry.",
-      "owner": "S1"
-    },
-    {
-      "path": "installer/NexPane.iss",
-      "rule": "PH001",
-      "match": "(ARCHITECTURE section 19.3, TODO P1.11 / P7.08)",
-      "justification": "Cross-reference to work items P1.11/P7.08 in docs/handoff/TODO.md, not a pending-work marker. Owner (S7, P7.08) rewords it to 'tasks P1.11 / P7.08' and deletes this entry.",
-      "owner": "S7"
-    }
-  ]
+  "entries": []
 }

@@ -1,7 +1,7 @@
 # NexPane — Architecture
 
 > Owner: Subagent 1 (Lead Architect & State Scribe). Status: Phase 1 deliverable, `[READY_FOR_QA]`.
-> Last updated: 2026-10-21. This is the binding technical design. Any deviation must be recorded in §19 (Decision Log) with a reason, and reflected in `TODO.md` / `STATE.md`.
+> Last updated: 2026-10-21. This is the binding technical design. Any deviation must be recorded in §21 (Decision Log) with a reason, and reflected in `TODO.md` / `STATE.md`.
 
 ## Table of Contents
 
@@ -51,7 +51,7 @@ NexPane is an unpackaged, x64, Windows 10 1809+ / Windows 11 desktop file manage
 | Native preview handlers | `IPreviewHandler` + `IInitializeWithStream/File/Item` hosted in a WPF `HwndHost` child window. WPF exposes raw HWNDs cleanly. |
 | Native file operations | `IFileOperation` (progress UI, conflict UI, undo, UAC elevation), `ShellExecuteEx` (`SEE_MASK_INVOKEIDLIST`, `SEE_MASK_NOASYNC`). |
 | Native drag & drop | OLE `IDataObject` / `IDropTarget` / `IDragSourceHelper` / `IDropTargetHelper`; `SHDoDragDrop`. WPF's own drag/drop is OLE-based, so the underlying `System.Runtime.InteropServices.ComTypes.IDataObject` can be handed straight to shell drop targets. |
-| Secrets | `System.Security.Cryptography.ProtectedData` (DPAPI, CurrentUser) and Windows Credential Manager (`CredWriteW` / `CredReadW` / `CredDeleteW` / `CredEnumerateW`) via P/Invoke. |
+| Secrets | Network credentials: Windows Credential Locker (`Windows.Security.Credentials.PasswordVault`) through the built-in C#/WinRT projection. AI keys: `System.Security.Cryptography.ProtectedData` (DPAPI, CurrentUser) and Windows Credential Manager (`CredWriteW` / `CredReadW` / `CredDeleteW` / `CredEnumerateW`) via P/Invoke (decision P1.14). |
 | NTFS fast enumeration | `DeviceIoControl` with `FSCTL_QUERY_USN_JOURNAL`, `FSCTL_ENUM_USN_DATA`, `FSCTL_READ_USN_JOURNAL`; raw `$MFT` reads; `ReadDirectoryChangesW` (raw P/Invoke with overlapped I/O, not `FileSystemWatcher`, see §7.4). |
 | WinRT APIs | `Windows.Media.Ocr` via the built-in C#/WinRT projection using TFM `net10.0-windows10.0.19041.0` with `SupportedOSPlatformVersion=10.0.17763.0`. |
 | Ecosystem | Mature libraries for every power-tool domain (archives, SSH, FTP, WebDAV, metadata, PDF, media tags, Whisper, AWS, OpenAI, Anthropic). |
@@ -78,7 +78,7 @@ NexPane is an unpackaged, x64, Windows 10 1809+ / Windows 11 desktop file manage
 <Deterministic>true</Deterministic><InvariantGlobalization>false</InvariantGlobalization>
 ```
 
-`global.json`: `{ "sdk": { "version": "10.0.100", "rollForward": "latestFeature" } }`.
+`global.json` (as committed): `{ "sdk": { "rollForward": "latestFeature", "version": "10.0.402" }, "test": { "runner": "Microsoft.Testing.Platform" } }` — pinned to the installed 10.0.402 feature band; `latestFeature` allows later 10.0.4xx+ bands; the `test.runner` entry selects Microsoft.Testing.Platform for `dotnet test` (§18, §21).
 
 ---
 
@@ -106,7 +106,7 @@ C:\Users\Ewais\Projects\NexPane\
 │  ├─ NexPane.Core/                 # net10.0 — models, VFS abstractions, query AST, all interfaces, no Win32
 │  ├─ NexPane.Shell/                # all COM / P/Invoke interop (CsWin32), no WPF
 │  ├─ NexPane.Storage/              # SQLite (Microsoft.Data.Sqlite), migrations, repositories
-│  ├─ NexPane.Security/             # DPAPI + Credential Manager ICredentialStore
+│  ├─ NexPane.Security/             # ICredentialStore: Credential Locker (network) + Credential Manager/DPAPI (AI keys)
 │  ├─ NexPane.Indexing/             # in-memory index, USN client, walker, watchers, crawler, content pipeline, IPC protocol
 │  ├─ NexPane.Search/               # lexer, parser, printer, planner, evaluator, live queries
 │  ├─ NexPane.Archives/             # 7z.dll engine + SharpCompress fallback, archive VFS
@@ -146,7 +146,7 @@ C:\Users\Ewais\Projects\NexPane\
 | NexPane.Core | classlib, `net10.0` | Domain models (`VfsPath`, `VfsEntry`, `IndexEntry`), query AST, all cross-module interfaces, `Result<T>`, clock/abstractions | none |
 | NexPane.Shell | classlib, windows | CsWin32 interop; shell items/PIDLs, context menu, IFileOperation, ShellExecuteEx, drag/drop, thumbnails, property store, volume/USN IOCTLs, `ReadDirectoryChangesW`, IFilter, CredMan, WNet, DWM | Core |
 | NexPane.Storage | classlib, windows | `SqliteConnectionFactory`, migrations (`index.db`, `app.db`), repositories | Core |
-| NexPane.Security | classlib, windows | `ICredentialStore` (CredMan + DPAPI overflow), `ISecretProtector` | Core, Shell |
+| NexPane.Security | classlib, windows | `ICredentialStoreProvider` → `CredentialLockerStore` (PasswordVault, network) and `CredentialManagerStore` (CredWrite + DPAPI overflow, AI keys), `ISecretProtector` | Core, Shell |
 | NexPane.Indexing | classlib, windows | `IndexStore` (in-memory), `UsnVolumeSource`, `WalkerVolumeSource`, `ChangeWatcher`, `NetworkCrawler`, content extraction pipeline, IPC protocol | Core, Shell, Storage |
 | NexPane.Search | classlib, windows | `QueryLexer`, `QueryParser`, `QueryPrinter`, `QueryPlanner`, `QueryEvaluator`, `LiveQueryHub` | Core, Storage |
 | NexPane.Archives | classlib, windows | `SevenZipArchiveProvider`, `SharpCompressArchiveProvider`, `ArchiveFileSystemProvider` | Core |
@@ -249,7 +249,7 @@ flowchart LR
     A3[NetworkCrawler<br/>SMB / FTP / SFTP / WebDAV] --> B
     A4[SnapshotLoader<br/>index.db entries] --> B
   end
-  B[[Channel&lt;IndexDelta&gt;]] --> C[IndexWriter thread]
+  B[["Channel of IndexDelta"]] --> C[IndexWriter thread]
   C --> D[(IndexStore generation N+1<br/>struct arrays + name arena)]
   C --> E[SnapshotWriter<br/>batched every 5 s]
   E --> F[(index.db: entries, volumes)]
@@ -322,7 +322,7 @@ sequenceDiagram
   P->>N: HTTPS (SSE / event stream)
   N-->>P: chunks
   P-->>F: IAsyncEnumerable<AiStreamChunk>
-  F-->>U: tokens coalesced every 50 ms; usage logged (no content)
+  F-->>U: tokens coalesced every 50 ms, usage logged (no content)
 ```
 
 ### 6.5 Preview and native context menu path
@@ -402,7 +402,7 @@ Struct-of-arrays, one segment per volume, grown in 64K-entry chunks to avoid LOH
 
 ### 7.6 Content pipeline
 
-- **Scope**: user-configured content locations (defaults: `%USERPROFILE%\Documents`, `Desktop`, `Downloads`); excludes from settings; max file size 50 MB (configurable); max extracted text 2 MB per document.
+- **Scope**: user-configured content locations (defaults: `%USERPROFILE%\Documents`, `Desktop`, `Downloads`); excludes from settings; max file size 50 MB (configurable); max extracted text 2 MB per document. All of these are edited in the Settings window (TODO P4.41).
 - **Extractors** (first match wins): `PlainTextExtractor` (BOM + UTF-8 validation + fallback to ANSI code page via `CodePagesEncodingProvider`; binary sniff rejects files with NUL in first 8 KB), `PdfPigExtractor` (text layer; if < 32 chars/page average → enqueue OCR), `OpenXmlExtractor` (.docx/.xlsx/.pptx), `EmlExtractor` (MimeKit), `MsgExtractor` (MsgReader), `IFilterExtractor` (`LoadIFilter` on Shell STA, for any other registered type e.g. `.doc`, `.rtf`, `.odt`), `ImageOcr` (on request or policy), `MediaTranscript` (on request).
 - **Change detection**: `(size, modified_utc)`; re-extract on change. Deletes cascade from index deltas.
 
@@ -699,7 +699,7 @@ CREATE TABLE network_connections (
     port                   INTEGER,
     root_path              TEXT NOT NULL DEFAULT '/',
     username               TEXT,
-    credential_target      TEXT,               -- Credential Manager target name; secret never stored here
+    credential_target      TEXT,               -- Credential Locker reference 'NexPane:net/<connection_id>'; secret never stored here
     options_json           TEXT NOT NULL DEFAULT '{}', -- passive mode, TLS mode, encoding, auth method, key file path
     crawl_enabled          INTEGER NOT NULL DEFAULT 0,
     crawl_interval_minutes INTEGER NOT NULL DEFAULT 360,
@@ -974,15 +974,31 @@ public interface ILiveQuery : IDisposable
 ```csharp
 namespace NexPane.Core.Security;
 
+/// Which Windows secret store backs a credential (decision P1.14, §21):
+///   Network → Windows Credential Locker (Windows.Security.Credentials.PasswordVault), resource "NexPane:net"
+///   Ai      → Credential Manager generic credentials (CredWriteW/CredReadW), target "NexPane:ai:<providerId>:<field>",
+///             with DPAPI-protected overflow files for secrets > 2 560 bytes
+public enum CredentialArea { Network, Ai }
+
 public interface ICredentialStore
 {
-    // target convention: "NexPane:<area>:<id>:<field>", e.g. "NexPane:ai:openai-work:apiKey"
-    ValueTask SetAsync(string target, string userName, ReadOnlyMemory<byte> secret, CancellationToken ct);
-    ValueTask<StoredCredential?> GetAsync(string target, CancellationToken ct);  // caller must Dispose (zeroes buffer)
-    ValueTask<bool> DeleteAsync(string target, CancellationToken ct);
-    ValueTask<IReadOnlyList<string>> ListTargetsAsync(string prefix, CancellationToken ct);
+    CredentialArea Area { get; }
+    // key: Network → connection_id (GUID string); Ai → "<providerId>:<field>", e.g. "openai-work:apiKey"
+    ValueTask SetAsync(string key, string userName, ReadOnlyMemory<byte> secret, CancellationToken ct);
+    ValueTask<StoredCredential?> GetAsync(string key, CancellationToken ct);  // caller must Dispose (zeroes buffer)
+    ValueTask<bool> DeleteAsync(string key, CancellationToken ct);
+    ValueTask<IReadOnlyList<string>> ListKeysAsync(CancellationToken ct);
+    ValueTask<int> PurgeAllAsync(CancellationToken ct);                      // used by `NexPane.exe --purge-user-data` (P4.43)
 }
 public sealed class StoredCredential : IDisposable { public string UserName { get; } public ReadOnlySpan<byte> Secret { get; } public void Dispose(); }
+
+/// Resolves the store for an area. Implementations live in NexPane.Security:
+///   CredentialLockerStore (PasswordVault, WinRT projection of net10.0-windows10.0.19041.0) and
+///   CredentialManagerStore (CredWriteW/CredReadW/CredDeleteW/CredEnumerateW via NexPane.Shell interop + ISecretProtector overflow).
+public interface ICredentialStoreProvider
+{
+    ICredentialStore For(CredentialArea area);
+}
 
 public interface ISecretProtector   // DPAPI CurrentUser with app entropy
 {
@@ -1247,12 +1263,12 @@ public interface IPreviewProvider
 ### 12.6 Network VFS
 | Protocol | Library | Auth | Change detection |
 |---|---|---|---|
-| SMB/CIFS | Native Windows client via UNC (`\\server\share`), `WNetAddConnection2W` (no drive letter) for explicit credentials | Windows integrated, or stored credential from CredMan | RDCW (server-dependent), else poll |
+| SMB/CIFS | Native Windows client via UNC (`\\server\share`), `WNetAddConnection2W` (no drive letter) for explicit credentials | Windows integrated, or stored credential from the Windows Credential Locker | RDCW (server-dependent), else poll |
 | FTP / FTPS (explicit & implicit) | FluentFTP | user/password; TLS 1.2/1.3; cert validation via system store + `tls_pins` TOFU prompt | poll (MLSD) |
-| SFTP | SSH.NET | password, private key (OpenSSH/PuTTY formats; passphrase in CredMan), keyboard-interactive | poll |
+| SFTP | SSH.NET | password, private key (OpenSSH/PuTTY formats; passphrase in the Credential Locker), keyboard-interactive | poll |
 | WebDAV (http/https) | WebDav.Client over `HttpClient` | Basic (HTTPS only), Digest, NTLM/Negotiate | poll (PROPFIND Depth 1) |
 
-Credentials: CredMan generic credentials, target `NexPane:net:<connection_id>`. SFTP host keys: TOFU with fingerprint dialog; mismatch blocks the connection with a warning (no silent override).
+Credentials (decision P1.14): **Windows Credential Locker** via `Windows.Security.Credentials.PasswordVault` (`ICredentialStoreProvider.For(CredentialArea.Network)`). Each connection stores one `PasswordCredential(resource: "NexPane:net", userName: <connection_id GUID>, password: <secret>)`. The display user name lives in `app.db network_connections.username` and `credential_target` holds `NexPane:net/<connection_id>`. For SMB, the password is read from the Locker only for the `WNetAddConnection2W` call and then zeroed. Entries are visible to the user under Control Panel › Credential Manager › **Web Credentials**. `PasswordVault.Add` failures (e.g. a per-app limit) are surfaced as a connection-save error, never swallowed. SFTP host keys: TOFU with fingerprint dialog; mismatch blocks the connection with a warning (no silent override).
 
 ---
 
@@ -1299,7 +1315,9 @@ Notes:
 - **Shell window**: custom chrome (`WindowChrome`), DWM dark title bar; content = `DockingManager` (Dirkster.AvalonDock).
   - Document area: `WorkspaceView` → `Grid` with two `FilePaneView`s and a `GridSplitter`; orientation toggle (horizontal/vertical); single-pane mode; **link mode**: navigation in the active pane mirrors the relative path in the other (if it exists), sort/view sync optional.
   - `FilePaneView`: tab strip (custom `TabControl` template: drag-reorder, drag between panes, pin, lock, middle-click close, overflow scroll + dropdown, "Reopen closed tab" stack of 25), breadcrumb address bar with editable text mode and autocomplete, `FileListView` (`ListView` + `GridView`, `VirtualizingPanel.IsVirtualizing=True`, `VirtualizationMode=Recycling`, `ScrollUnit=Pixel`), status bar.
-  - Anchorables: Folder tree, Preview, Metadata inspector, Search & Advanced Filter builder, AI assistant, Script console, Transfers queue, Log.
+  - Anchorables: Folder tree, Preview, Metadata inspector, Search & Advanced Filter builder, AI assistant, Script console, Transfers queue (queued/active/done/failed jobs from `ITransferService` and IFileOperation, with progress, speed, cancel and retry; TODO P5.36), Log.
+- **Settings window** (TODO P4.41): indexing scope (per-volume include/exclude, content locations §7.6, exclude globs, max content file size, R17 memory warning), general, appearance, shortcuts, AI providers (P6.05), network connections (P5.31); persisted to `settings.json` / `app.db`.
+- **Archive commands** (TODO P5.35): Extract here / Extract to… / Add to archive… / Test archive, plus add/remove inside `archive:` folders and password prompts (§12.1).
 - **Command system**: `ICommandRegistry` with stable ids (`nav.back`, `pane.swap`, `tab.new`, `file.rename`, `search.focus`, `ai.summarize`, `script.<id>.<button>` …); keyboard shortcuts (with two-key chords, e.g. `Ctrl+K, Ctrl+T`) stored in `settings.json`; a Command Palette (`Ctrl+Shift+P`).
 - **Toolbars**: main toolbar + Quick Access Toolbar; customization dialog lists all commands; drag from list onto a toolbar or reorder within it; layout persisted in `settings.json`.
 - **Themes**: `Themes/Tokens.xaml` defines semantic brush keys (`Brush.Surface`, `Brush.Accent`, …); `Dark.xaml`, `Light.xaml` provide values; Custom themes are JSON token overrides compiled into a `ResourceDictionary` at runtime; "Follow system" listens to `UISettings.ColorValuesChanged` / `WM_SETTINGCHANGE (ImmersiveColorSet)`. AvalonDock themed via `Dirkster.AvalonDock.Themes.VS2013` dark/light with token overrides. AvalonEdit highlighting definitions per theme.
@@ -1367,7 +1385,7 @@ Versions: latest stable at repo init, pinned in `Directory.Packages.props` (exce
 
 | Area | Control |
 |---|---|
-| Secrets at rest | Credential Manager generic credentials (`CRED_PERSIST_LOCAL_MACHINE`, per-user, non-roaming). Secrets larger than `CRED_MAX_CREDENTIAL_BLOB_SIZE` (2 560 bytes, e.g. long AWS session tokens) are DPAPI-protected (`DataProtectionScope.CurrentUser`, purpose-specific entropy) into `%LOCALAPPDATA%\NexPane\secrets\<sha256(target)>.bin`, with the CredMan entry holding a pointer marker. Secrets are never in `settings.json`, `app.db`, logs, crash dumps or URLs. Secret buffers zeroed after use (`CryptographicOperations.ZeroMemory`). |
+| Secrets at rest | Two Windows stores, by area (decision P1.14). **Network credentials** (SMB/FTP/FTPS/SFTP/WebDAV passwords, SSH key passphrases) go to the **Windows Credential Locker** (`PasswordVault`, resource `NexPane:net`, one entry per connection, per-user and encrypted by Windows). **AI provider keys** (API keys, AWS access key/secret/session token) use **DPAPI / Credential Manager**: Credential Manager generic credentials (`CRED_TYPE_GENERIC`, target `NexPane:ai:<providerId>:<field>`, `CRED_PERSIST_LOCAL_MACHINE`, per-user, non-roaming). AI secrets larger than `CRED_MAX_CREDENTIAL_BLOB_SIZE` (2 560 bytes, e.g. long AWS session tokens) are DPAPI-protected (`DataProtectionScope.CurrentUser`, purpose-specific entropy) into `%LOCALAPPDATA%\NexPane\secrets\<sha256(target)>.bin`, with the CredMan entry holding a pointer marker. Secrets are never in `settings.json`, `app.db`, logs, crash dumps or URLs. Secret buffers zeroed after use (`CryptographicOperations.ZeroMemory`). |
 | Secrets in UI | Password boxes only; "reveal" requires the user to click and auto-hides after 10 s. |
 | Logs | Serilog destructuring policy redacts properties named `*key*`, `*secret*`, `*token*`, `*password*`, `Authorization` headers; HTTP logging disabled for AI/Network clients. |
 | AI egress | §13.3. |
@@ -1376,7 +1394,7 @@ Versions: latest stable at repo init, pinned in `Directory.Packages.props` (exce
 | Preview handlers | Out-of-proc first (`prevhost.exe`), crash sentinel + blocklist, 5 s timeout, can be disabled per extension. Markdown HTML rendered in WebView2 with `IsScriptEnabled=false`, `AreDefaultContextMenusEnabled=false`, navigation blocked, CSP `default-src 'none'; img-src data: file:; style-src 'unsafe-inline'`. |
 | Archives | Zip-slip, symlink and bomb guards (§12.1); temp dirs ACL'd to current user and cleaned at exit/startup. |
 | Network | TLS 1.2+ only; FTPS cert validation + TOFU pin; SFTP TOFU host keys with hard fail on mismatch; WebDAV Basic only over HTTPS. |
-| DLL loading | `SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_APPLICATION_DIR)` at startup; native libs loaded by absolute path. |
+| DLL loading | `SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_APPLICATION_DIR)` as the first statement of both `NexPane.exe` and `NexPane.IndexService.exe` entry points; native libs loaded by absolute path (TODO P4.42). |
 | Regex | NonBacktracking default; timeouts for backtracking fallback. |
 | Downloads | Whisper models and GPU runtime packs (CUDA/Vulkan, §13.2): HTTPS only, hashes pinned in the app (SHA-256, or nuget.org package SHA-512), consent dialog showing size and publisher license, atomic move after verification, loaded by absolute path from `%LOCALAPPDATA%\NexPane\runtimes` (per-user ACL). Nothing else is downloaded at runtime. |
 | Telemetry | None. Crash logs stay local; "Copy diagnostics" button for users. |
@@ -1417,7 +1435,7 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 |---|---|---|---|
 | Unit | Core, Search (parser/printer/planner/evaluator), Indexing (store, delta apply, USN record parsing from captured binary fixtures, MFT record parser with fixups), Sync planner, rename engine, Security (with fake CredMan), AI request/response mapping, Scripting API/permissions | xUnit v3 + FluentAssertions 7.2.0 + NSubstitute | Every PR; ≥ 80 % line coverage for Core/Search/Indexing/Sync/Metadata rename engine |
 | Property | `Parse(Print(ast)) == ast`; rename plan has no collisions; sync plan idempotence | xUnit theories with seeded random generators (no extra lib) | Every PR |
-| Integration (real OS) | Shell STA services (context menu built on temp folders, IFileOperation copy/undo, thumbnails, property store), CredMan round-trip, DPAPI, RDCW events, SQLite migrations, archives over `tests/TestAssets`, OCR on fixture images (skipped with reason when OCR language missing), Whisper tiny model (opt-in via `NEXPANE_IT_WHISPER=1`) | xUnit v3 with STA helper (`StaTestRunner` running test body on a dedicated STA thread) | Every PR (local), nightly |
+| Integration (real OS) | Shell STA services (context menu built on temp folders, IFileOperation copy/undo, thumbnails, property store), Credential Locker (`PasswordVault`) and Credential Manager round-trips, DPAPI, RDCW events, SQLite migrations, archives over `tests/TestAssets`, OCR on fixture images (skipped with reason when OCR language missing), Whisper tiny model (opt-in via `NEXPANE_IT_WHISPER=1`) | xUnit v3 with STA helper (`StaTestRunner` running test body on a dedicated STA thread) | Every PR (local), nightly |
 | Network integration | FTP/FTPS/SFTP/WebDAV against real servers | Env-gated: `NEXPANE_IT_SFTP=host;user;credTarget` etc.; WireMock for WebDAV protocol shape | Nightly / pre-release |
 | AI contract | Each provider's request JSON and SSE parsing against recorded fixtures (WireMock); live smoke tests env-gated (`NEXPANE_IT_OPENAI_KEY_TARGET` naming a CredMan target, never the key itself) | WireMock.Net | Every PR (fixtures), pre-release (live) |
 | Elevated | USN/MFT against a VHDX created and mounted by the test (`New-VHD` + `Mount-VHD` requires Hyper-V module, fallback `diskpart` script) | xUnit, `[Trait("Category","Elevated")]` | Pre-release, run as admin |
@@ -1427,7 +1445,9 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 | E2E UI | Launch, dual pane navigation, tabs, search-as-you-type, preview, context menu appears (UIA Menu element), batch rename preview/apply/undo, theme switch, session restore | FlaUI.UIA3 | Pre-release |
 | Installer | Silent install `/VERYSILENT /SUPPRESSMSGBOXES /DIR=...`, verify files, shortcuts, registry verbs, uninstall leaves no files except user data (by choice) | Pester-free PowerShell script `eng/test-installer.ps1` in a clean Windows Sandbox | Pre-release |
 
-**Definition of Done** for any TODO item: code merged, tests listed in its acceptance criterion passing, no `TODO`/`NotImplementedException`/placeholder in the shipped path (zero-placeholder rule), docs updated, QA (Subagent 7) marks `[VERIFIED_COMPLETE]`.
+**Definition of Done** for any TODO item: code merged, tests listed in its acceptance criterion passing, no `TODO`/`NotImplementedException`/placeholder in the shipped path (zero-placeholder rule), docs updated, QA (Subagent 6, QA, Verification & Security Inspector, with veto power) marks `[VERIFIED_COMPLETE]`.
+
+**Roster** (user-mandated numbering, see TODO.md): S1 Lead Architect & State Scribe · S2 Core Systems & Indexing Engine Engineer · S3 Native Windows Shell & OS Integration Engineer · S4 AI & Semantic Pipeline Engineer · S5 UI/UX & Workspace Engineer · S6 QA, Verification & Security Inspector (veto) · S7 Release & Installer Packaging Engineer (incl. icons/assets).
 
 ---
 
@@ -1448,11 +1468,26 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 - `AppId={{23676795-F60E-4EAF-95C6-C4D81BAD01C1}` (fixed forever; changing it breaks upgrades), `ArchitecturesAllowed=x64compatible`, `ArchitecturesInstallIn64BitMode=x64compatible`, `MinVersion=10.0.17763`, `PrivilegesRequired=admin`, `PrivilegesRequiredOverridesAllowed=dialog` (per-user install possible, then the Index Service task is disabled), `LicenseFile=..\LICENSE.txt` (proprietary EULA, decision D1; `THIRD-PARTY-NOTICES.txt` installed to `{app}`), no `SignTool` directive (decision D2: unsigned), `SetupIconFile=..\assets\icons\NexPane.ico`, `UninstallDisplayIcon={app}\NexPane.exe`, `WizardStyle=modern`, `OutputDir=..\dist`, `OutputBaseFilename=NexPane-Setup`, `SolidCompression=yes`, `Compression=lzma2/ultra64`.
 - Pages: Welcome → License → Directory → Start Menu folder → Tasks → Ready → Install → Finish (launch option).
 - Tasks: `desktopicon`, `contextmenu` ("Add 'Open in NexPane' to Explorer context menu", checked; classic menu only — Windows 11 shows it under "Show more options", decision D2), `indexservice` ("Install NexPane Index Service for fast NTFS indexing", **checked by default** in admin installs per decision D3, hidden in per-user installs). The task description carries the privacy note: *"Runs as a background Windows service with administrator rights to read the NTFS change journal. File names are only shown to Windows users who are allowed to list the containing folder. Nothing leaves this computer."*
-- Uninstall "remove user data" also deletes `%LOCALAPPDATA%\NexPane\runtimes\` (GPU Whisper packs) and downloaded models.
 - Registry (`HKA` root → HKLM for admin, HKCU for per-user): `Software\Classes\Directory\shell\NexPane` (`(Default)=Open in NexPane`, `Icon={app}\NexPane.exe,0`, `command\(Default)="{app}\NexPane.exe" "%V"`), same for `Directory\Background\shell\NexPane` and `Drive\shell\NexPane`; all with `uninsdeletekey`.
-- Service: `[Run]` `sc.exe create NexPaneIndex binPath= "\"{app}\NexPane.IndexService.exe\"" start= delayed-auto obj= LocalSystem DisplayName= "NexPane Index Service"` then `sc.exe description` and `sc.exe start`; `[UninstallRun]` `sc.exe stop` + `sc.exe delete`.
+- Service (decision P1.11, §21): managed in **`[Code]`, not `[Run]`/`[UninstallRun]`**, so that the task state, upgrades and errors are handled explicitly.
+  - `PrepareToInstall` stops a running `NexPaneIndex` (a synchronous `net stop`, waiting until it has stopped) so its exe can be replaced.
+  - `CurStepChanged(ssPostInstall)`, when the `indexservice` task is selected, runs `%SystemRoot%\System32\sc.exe create|config NexPaneIndex binPath= "\"{app}\NexPane.IndexService.exe\"" start= delayed-auto obj= LocalSystem DisplayName= "NexPane Index Service"`, then `sc.exe description` (non-fatal) and `sc.exe start` (an "already running" result is accepted). A failure is reported to the user and logged.
+  - When the task is deselected on an upgrade, the service is stopped and deleted.
+  - `CurUninstallStepChanged(usUninstall)` in admin mode stops and deletes the service.
+  - All `sc.exe` calls run hidden through a `RunHidden` helper that checks exit codes.
 - WebView2: `[Code]` checks `HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}` `pv`; if missing, runs the bundled Evergreen Bootstrapper (`MicrosoftEdgeWebview2Setup.exe /silent /install`); failure is non-fatal (Markdown preview falls back to plain text).
-- Uninstall: registered automatically by Inno; asks "Remove user data (index, settings, sessions)?" — default No.
+- Uninstall: registered automatically by Inno. It asks "Remove NexPane user data (index, settings, sessions, scripts, downloaded models and saved credentials)?" with **default No**. On No, nothing below is touched.
+  On Yes (TODO P7.14), the data of the **installing (original, non-elevated) user** is removed:
+  1. `%LOCALAPPDATA%\NexPane\`: `index.db`, `app.db`, logs, temp, `secrets\` DPAPI overflow files, `models\`, `runtimes\` (GPU Whisper packs).
+  2. `%APPDATA%\NexPane\`: `settings.json`, `scripts\`.
+  3. Saved credentials:
+     - Credential Manager generic credentials with targets `NexPane:*` (AI keys, §16);
+     - Credential Locker (`PasswordVault`) entries with resource `NexPane:net` (network credentials, decision P1.14).
+
+  Because an elevated uninstaller's `{localappdata}`/`{userappdata}` can resolve to the administrator account, and Inno's Pascal scripting cannot call the WinRT `PasswordVault`, the uninstaller does not delete these itself. Instead, during `usUninstall` (before files are removed) it runs `{app}\NexPane.exe --purge-user-data` through `ExecAsOriginalUser`. That command (TODO P4.43) deletes items 1–3 for that user and exits 0/1. If the original user cannot be determined (e.g. a silent uninstall run as SYSTEM), the uninstaller logs this and leaves the data in place rather than deleting another account's data.
+
+  Machine-wide items (`{app}`, HKA registry verbs, the service) are always removed. Other user profiles on the machine are never touched.
+  *Current state:* `installer/NexPane.iss` (P1.11) still deletes only `{localappdata}\NexPane` in `usPostUninstall`; P7.14 replaces this with the flow above.
 - Upgrade: same AppId → in-place upgrade; `CloseApplications=yes` with Restart Manager.
 
 ---
@@ -1467,7 +1502,7 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 | R4 | RAR archives | RAR creation is license-restricted (RARLAB). | RAR/RAR5 are list/extract/test only (incl. encrypted). |
 | R5 | Authentic native context menu | `IContextMenu` yields the classic menu (equivalent to Windows 11 "Show more options"). Windows 11 modern-menu-only entries from packaged apps (`IExplorerCommand` via sparse packages) may be absent. Cross-folder multi-selection menus can omit some third-party handlers. Native menus follow system dark/light only via the undocumented `uxtheme` ordinal 135 `SetPreferredAppMode`; guarded by OS build check and a setting, no-op if unavailable. | Documented; tested on Win10 22H2 and Win11 24H2/25H2. |
 | R6 | "Open in NexPane" in Explorer | On Windows 11 classic registry verbs appear only under "Show more options"; the top-level modern menu requires package identity (sparse MSIX + `IExplorerCommand` COM server), which conflicts with the "unpackaged" decision. | **Decided (D2): classic verbs only; a Windows 11 top-level entry is out of scope for v1** (it would also require code signing, which is not available). |
-| R7 | Native preview handlers | Availability depends on installed handlers (e.g. Office preview requires Office). Some handlers crash or hang; some only support in-proc. Win32 child HWND cannot have WPF content drawn over it (airspace). | Out-of-proc first, crash sentinel/blocklist, built-in fallbacks (OpenXml text for .docx etc.), no WPF overlays over the preview area. |
+| R7 | Native preview handlers | Availability depends on installed handlers (e.g. Office preview requires Office). Some handlers crash or hang; some only support in-proc. Win32 child HWND cannot have WPF content drawn over it (airspace). | Out-of-proc first, crash sentinel/blocklist, built-in Office/text fallback preview when no handler is registered or it is blocklisted (`.docx`/`.xlsx`/`.pptx` via OpenXml, `.rtf`/`.odt` via IFilter; TODO P4.40), no WPF overlays over the preview area. |
 | R8 | Audio/video preview | WPF `MediaElement` uses Media Foundation: codecs depend on the OS (HEVC needs the paid Store extension; MKV/FLAC supported on Win10 1809+ through MF; no AV1 without the AV1 extension). | MediaElement in v1; unsupported formats show metadata + "Open externally". LibVLC rejected (license mix, size, airspace). |
 | R9 | OCR | `Windows.Media.Ocr` requires the OCR language capability installed per language; no handwriting; accuracy below commercial engines on low-quality scans. | Lists installed languages, links to Settings › Language to add more; quality noted in UI. |
 | R10 | Local transcription | Whisper on CPU: `base` ≈ 5–10× real-time on the reference machine, `large-v3-turbo` ≈ 0.5–1× real-time; models 75 MB–1.6 GB downloaded separately. | Model picker with size/speed hints; cloud STT available. **GPU transcription is in scope for v1 (decision D5)** via optional CUDA (≈ 500 MB) and Vulkan packs (§13.2). Remaining limits: CUDA needs an NVIDIA GPU with a CUDA 12-capable driver; Vulkan speed varies by driver; very old GPUs and systems with < 4 GB VRAM fall back to CPU or smaller models. |
@@ -1477,7 +1512,7 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 | R14 | Network change detection | FTP/SFTP/WebDAV have no change notifications; SMB notify is server-dependent. | Polling/crawl intervals; manual refresh; staleness indicator. |
 | R15 | Metadata writing | Coverage limited by handlers: RAW EXIF write unsupported; PDF write rewrites the file; Property System writes depend on installed property handlers. | Read-only fields shown greyed with reason. |
 | R16 | Long paths | .NET handles `\\?\` paths, but many shell APIs (PIDLs, IContextMenu, preview handlers, ShellExecuteEx) are limited to `MAX_PATH`. | `longPathAware` manifest; file ops through Win32 `\\?\` fallback when IFileOperation fails; context menu for > 260-char paths falls back to NexPane's built-in menu with a notice. |
-| R17 | Memory at extreme scale | 10M entries ≈ 1.6 GB RAM. | Per-volume include/exclude; warning when projected index > 25 % of physical RAM. |
+| R17 | Memory at extreme scale | 10M entries ≈ 1.6 GB RAM. | Per-volume include/exclude in the Settings window (TODO P4.41); warning when projected index > 25 % of physical RAM. |
 | R18 | Installer size | Self-contained .NET + WPF + native libs ≈ 180–230 MB installed, ≈ 70–90 MB installer. Whisper models not bundled. | Accepted. |
 | R19 | SmartScreen / unsigned binaries | **Decision D2: v1 ships unsigned.** Windows SmartScreen shows "Windows protected your PC / Unknown publisher" for `NexPane-Setup.exe` until reputation builds (users must click "More info → Run anyway"); UAC shows "Unknown publisher"; some enterprise policies (WDAC/AppLocker publisher rules) and antivirus heuristics may block unsigned binaries. | Documented in release notes and on the download page; optional signing step in `eng/publish.ps1` can be enabled later without code changes. |
 | R20 | FluentAssertions licensing | v8+ requires a paid license for commercial use. | Pinned 7.2.0 (Apache-2.0). |
@@ -1524,40 +1559,78 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 | 2026-10-21 | GPU Whisper via on-demand CUDA/Vulkan packs with hash-pinned downloads, CPU fallback | D5; keeps installer size unchanged |
 | 2026-10-21 | P1.11: Index Service install/upgrade/uninstall is done in the `.iss` `[Code]` section (`sc.exe query/create/config/description/start/delete`, synchronous `net stop`) instead of `[Run]`/`[UninstallRun]` entries; same commands and service settings as §19.3 | Exit codes are checked (non-fatal error dialog, walker fallback), an existing service is reconfigured on upgrade instead of `sc create` failing, the service is fully stopped before files are replaced/removed, and deselecting the task on upgrade removes the service |
 | 2026-10-21 | P1.11: shared `eng/common.ps1`; every eng script has `-DryRun`; ISCC warnings fail `eng/installer.ps1`; `eng/installer.ps1 -AllowMissingBranding` (→ ISCC `/DNoBranding`) omits icon/wizard-image directives **for pre-Phase-2 pipeline verification only** — release builds (P7.08) must not use it; without it, missing branding assets fail both the script and the `.iss` (`#error`) | Pipeline verifiable before Phase 2 without dummy icons |
+| 2026-10-21 | Installer output is the **unversioned** `dist\NexPane-Setup.exe` (`OutputBaseFilename=NexPane-Setup`; version is in the file's ProductVersion resource) — orchestrator decision, commit `6e4bdbb` | Matches the product spec's file name; stable download link |
+| 2026-10-21 | **P1.14 credential stores.** Network connection credentials → **Windows Credential Locker** (`Windows.Security.Credentials.PasswordVault`, resource `NexPane:net`, one entry per connection). AI provider keys → **DPAPI / Credential Manager** (generic credentials via `CredWriteW`, target `NexPane:ai:<providerId>:<field>`, DPAPI overflow files for > 2 560-byte secrets such as long AWS session tokens). Exposed as `ICredentialStoreProvider.For(CredentialArea)` (§10.3). | Follows the user's spec literally ("Windows Credential Locker" for network, "DPAPI / Credential Manager" for AI keys). PasswordVault is available to unpackaged desktop apps through the WinRT projection of `net10.0-windows10.0.19041.0`. Verified by S1 on 2026-10-21 (Windows 11 build 26300) from an unpackaged process: 15 entries under one resource were stored with no error (Microsoft's docs mention a 10-credential-per-app limit for packaged apps; it was not enforced here, and `Add` failures are surfaced, never swallowed), a 4 000-character secret round-tripped, and all test entries were removed. CredWrite generic credentials stay for AI keys because the spec names Credential Manager/DPAPI and because the uninstaller and `cmdkey` can enumerate them by the `NexPane:` prefix. |
+| 2026-10-21 | User-data purge is a product command, `NexPane.exe --purge-user-data` (TODO P4.43), run by the uninstaller through `ExecAsOriginalUser` (§19.3, TODO P7.14) | An elevated uninstaller cannot reliably resolve the original user's profile folders, and Inno Pascal cannot call the WinRT PasswordVault |
+| 2026-10-21 | Subagent roster renumbered to the user-mandated numbering (S2 Core Systems & Indexing, S3 Native Shell & OS, S4 AI, S5 UI/UX, S6 QA & Security with veto, S7 Release & Packaging incl. branding); every owner tag remapped by role | User mandate |
+| 2026-10-21 | `.gitignore`: every directory pattern anchored to the root or to a project folder (`/src/*/`, `/tests/*/`, `/tools/*/`); `tests/TestAssets/**` always re-included | QA P1.07: unanchored patterns (with `core.ignorecase=true`) ignored source folders such as `Models/`, `Secrets/`, `Packages/`, `Log(s)/` |
 
 ---
 
 ## 22. Requirements traceability matrix
 
-| Scope item | Design section | TODO ids |
+Every requirement of the product scope (A–E) and every cross-cutting requirement maps to at least one work item. Owners follow the user-mandated roster: S1 Architect, S2 Core Systems & Indexing, S3 Native Shell & OS, S4 AI, S5 UI/UX, S6 QA & Security (veto), S7 Release & Packaging.
+
+| Requirement | Design section | TODO ids |
 |---|---|---|
-| A. Sub-ms search-as-you-type, in-memory filename index | §7.1, §7.2, §17, R1 | P3.05–P3.08, P3.24, P3.25, P4.13 |
-| A. Full regex over names/paths/contents | §7.2, §8.2 | P3.22, P3.23, P3.33 |
-| A. Inline operators + boolean/grouping | §8 | P3.19–P3.21, P3.27–P3.29, P3.32 |
-| A. Visual Advanced Filter builder | §8.3, §14 | P3.20, P4.14 |
-| A. USN/MFT when elevated; fallback walker + RDCW | §7.3–§7.5, R2, R3 | P3.09–P3.17 |
-| A. Network/NAS/mapped drive crawler | §7.3, §12.6 | P3.18, P5.33 |
-| A. Live result updates without blocking UI | §5, §6.3 | P3.26, P4.03, P4.06 |
-| A. User-defined search categories | §9.2 | P3.28, P4.15 |
-| A. ShellExecuteEx on double-click | §11 | P3.34 |
-| B. Dual pane, linked/independent, orientation | §14 | P4.07 |
-| B. Unlimited tabs, lock/pin, session restore | §14, §9.2 | P4.08, P4.12 |
-| B. Preview pane (PDF, images, A/V, code, Markdown, native handlers) | §6.5, §11, R7, R8 | P4.25–P4.33 |
-| B. Native Shell context menu in list and preview | §6.5, §11, R5 | P4.17–P4.19, P4.34 |
-| B. Archive engine (zip/7z/tar/gz/rar; RAR read-only) | §12.1, R4 | P5.01–P5.08 |
-| B. Folder compare/sync | §12.2 | P5.09–P5.14 |
-| B. Batch renamer with undo | §12.3 | P5.15–P5.18 |
-| B. Metadata inspector/editor (EXIF, ID3, PDF, ADS, property system) | §12.4, R15 | P5.19, P5.20 |
-| B. Scripting engine + console + toolbar buttons | §12.5 | P5.21–P5.26 |
-| B. Network VFS SMB/FTP/FTPS/SFTP/WebDAV + CredMan | §12.6, §16 | P5.27–P5.32 |
-| B. QAT, toolbar customization, docking, shortcuts, themes | §14 | P4.04, P4.35–P4.38 |
-| C. Provider abstraction (Foundry, Gemini, Claude, OpenAI, Bedrock, local) | §13.1, §10.7 | P6.02, P6.05–P6.11 |
-| C. Keys via DPAPI/CredMan | §16 | P6.01 |
-| C. Semantic search (embeddings + local vector index) | §9.3, §13.2, R11, R12 | P6.12–P6.14 |
-| C. NL → query assistant | §13.2 | P6.15 |
-| C. Summarize / Translate / Prepare-a-Reply | §13.2 | P6.16, P6.17 |
-| C. Transcription with .srt/.txt export | §13.2, R10 | P6.18–P6.21 |
-| C. GPU Whisper (decision D5) | §13.2, §16, R10 | P6.26–P6.30 |
-| C. OCR (images, scanned PDFs) + visual descriptions indexed | §13.2, R9 | P6.22, P6.23 |
-| D. SVG logo → multi-res ICO, wizard bitmaps | §19.1 | P2.01–P2.08 |
-| E. Inno Setup installer (license, dir, shortcuts, Explorer verbs, uninstaller, self-contained) | §19.2, §19.3, R6, R19 | P1.13, P7.07–P7.11 |
+| **A. Search & indexing** | | |
+| A1. Sub-ms search-as-you-type over in-memory filename index | §7.1, §7.2, §17, R1 | P3.05–P3.08, P3.24, P3.25, P3.35, P4.13 |
+| A2. Full regex over names / paths / contents | §7.2, §8.2 | P3.22, P3.23, P3.33 |
+| A3. Inline operators (ext:, size:, modified:, content:, path:, type:, regex:) + AND/OR/NOT + grouping | §8 | P3.19–P3.21, P3.27–P3.29, P3.32 |
+| A4. Visual Advanced Filter builder | §8.3, §14 | P3.20, P4.14 |
+| A5. USN/MFT enumeration when elevated (Index Service) | §7.3–§7.5, R2, R3 | P3.09–P3.14, P3.17, P4.16 |
+| A6. Fallback multithreaded walker + ReadDirectoryChangesW watchers | §7.3, §7.4 | P3.15–P3.17 |
+| A7. Background crawler / cache index for network shares, NAS, mapped drives | §7.3, §12.6 | P3.18, P5.33 |
+| A8. Index scope / content locations configurable | §7.6, R17 | P4.41 |
+| A9. Live result updates without blocking UI | §5, §6.3 | P3.26, P4.03, P4.06 |
+| A10. User-defined search categories (criteria, filter chains, column layouts) | §9.2 | P3.28, P4.15 |
+| A11. ShellExecuteEx launch on double-click | §11 | P3.34 |
+| **B. Workspace & power tools** | | |
+| B1. Dual pane (horizontal/vertical, linked/independent) | §14 | P4.07 |
+| B2. Unlimited tabs, lock/pin, session restore | §14, §9.2 | P4.08, P4.12 |
+| B3. Preview: images, PDF, audio/video, code, Markdown, text | §6.5, R8 | P4.25–P4.31 |
+| B4. Preview: Office/text via native preview handlers, with built-in fallback | §6.5, §11, R7 | P4.32, P4.33, P4.40 |
+| B5. Authentic native Shell context menu in list and preview | §6.5, §11, R5 | P4.17–P4.19, P4.34 |
+| B6. Native file operations, clipboard, drag/drop, thumbnails, Explorer "Open in NexPane" | §11, R6 | P4.20–P4.24 |
+| B7. Archive engine (zip/7z/tar/gz/rar virtual folders; RAR read/extract only) | §12.1, R4 | P5.01–P5.08 |
+| B8. Archive operations UI (extract, create, test, add/remove, password) | §12.1, §14 | P5.35 |
+| B9. Folder compare/sync (timestamp/size/SHA-256, one/two-way, conflicts, local or remote) | §12.2, R13 | P5.09–P5.14 |
+| B10. Batch renamer (regex, numbering, date/EXIF tokens, live preview, undo) | §12.3 | P5.15–P5.18 |
+| B11. Metadata inspector/editor (EXIF, ID3, PDF, ADS, property system) | §12.4, R15 | P5.19, P5.20 |
+| B12. Scripting engine (Jint) with NexPane.* API, toolbar buttons, console | §12.5 | P5.21–P5.26 |
+| B13. Network VFS SMB/FTP/FTPS/SFTP/WebDAV | §12.6, R14 | P5.27–P5.30, P5.32 |
+| B14. Network credentials in the Windows Credential Locker | §10.3, §12.6, §16, §21 (P1.14) | P1.14, P5.31, P6.01 |
+| B15. Transfers queue panel | §14 | P5.36 |
+| B16. Quick Access Toolbar, drag-drop toolbar customization, docking, shortcuts | §14 | P4.35–P4.38 |
+| B17. Theme engine (Dark/Light/Custom) | §14 | P2.08, P4.04 |
+| **C. AI** | | |
+| C1. Provider abstraction: Azure AI Foundry, Gemini, Claude, OpenAI, Bedrock, OpenAI-compatible local (LM Studio/Ollama/custom, /v1/models) | §13.1, §10.7 | P6.02, P6.05–P6.11 |
+| C2. AI keys via DPAPI / Credential Manager | §10.3, §16, §21 (P1.14) | P6.01, P6.03 |
+| C3. Egress consent and usage logging | §13.3 | P6.04 |
+| C4. Semantic search (embeddings + local vector index) | §9.3, §13.2, R11, R12 | P6.12–P6.14 |
+| C5. NL → query-operator assistant | §13.2 | P6.15 |
+| C6. Summarize / Translate / Prepare-a-Reply | §13.2 | P6.16, P6.17, P6.24 |
+| C7. Audio/video transcription with timestamped .srt/.txt export (Whisper.net local + cloud STT) | §13.2, R10 | P6.18–P6.21 |
+| C8. GPU Whisper (decision D5) | §13.2, §16, R10 | P6.26–P6.30 |
+| C9. Image OCR (Windows.Media.Ocr) + scanned PDFs, indexed into search | §13.2, R9 | P6.22 |
+| C10. Visual descriptions indexed into search | §13.2 | P6.23 |
+| **D. Branding** | | |
+| D1. Generated SVG logo → multi-resolution .ico (16–256) for exe, title bar, tray, installer | §19.1 | P2.01–P2.05, P2.07 |
+| D2. Installer wizard bitmaps | §19.1 | P2.06 |
+| **E. Installer** | | |
+| E1. `dist\NexPane-Setup.exe` (Inno Setup 6) with license page (proprietary EULA), directory selection, desktop/Start Menu shortcuts | §19.3, D1 | P1.11, P1.13, P7.08 |
+| E2. Explorer "Open in NexPane" for folders/drives/background (classic menu) | §11, §19.3, R6 | P4.24, P7.08, P7.09 |
+| E3. Registered uninstaller; user-data removal for the installing user (%LOCALAPPDATA%, %APPDATA%, Credential Manager + Credential Locker entries) | §19.3 | P4.43, P7.14 |
+| E4. Self-contained .NET publish | §19.2 | P1.11, P7.07 |
+| E5. Index Service task (checked by default, privacy note) | §19.3, D3 | P3.13, P7.08, P7.09 |
+| E6. Unsigned release, optional signing step | §16, R19, D2 | P7.11, P7.12 |
+| **Cross-cutting** | | |
+| X1. Zero-placeholder rule | HANDOFF §7, §18 | P1.12, P7.01 |
+| X2. Layering / dependency rules | §4 | P1.10, P3.37 |
+| X3. Process hardening (DLL search order) | §16 | P4.42 |
+| X4. Security audit, secret-leak checks | §16 | P6.25, P7.04 |
+| X5. Performance budgets | §17 | P3.35, P6.29, P7.03 |
+| X6. Accessibility | §14 | P7.05 |
+| X7. Third-party notices / license compliance | §15, R21 | P1.13, P7.06 |
+| X8. QA verification per phase (S6, veto) | §18 | P2.09, P3.36, P4.39, P5.34, P6.25, P7.01–P7.05 |
+| X9. Handoff docs kept in sync | HANDOFF §7 | P1.02–P1.08, P7.13 |

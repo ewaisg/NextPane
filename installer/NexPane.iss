@@ -1,4 +1,4 @@
-; NexPane installer - Inno Setup 6 (ARCHITECTURE section 19.3, TODO P1.11 / P7.08).
+; NexPane installer - Inno Setup 6 (ARCHITECTURE section 19.3, tasks P1.11 / P7.08).
 ;
 ; Compile through eng\installer.ps1, which passes:
 ;   /DAppVersion=<Directory.Build.props Version>   /DPublishDir=<absolute publish folder>
