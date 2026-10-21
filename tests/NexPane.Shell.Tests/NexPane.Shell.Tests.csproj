@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <RootNamespace>NexPane.Shell.Tests</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

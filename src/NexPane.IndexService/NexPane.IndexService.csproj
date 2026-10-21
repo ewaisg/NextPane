@@ -1,10 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
+<Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RootNamespace>NexPane.IndexService</RootNamespace>
     <AssemblyName>NexPane.IndexService</AssemblyName>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- Exe icon resource (task P2.07), shown in Task Manager and services tooling. -->
+    <ApplicationIcon>..\..\assets\icons\NexPane.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

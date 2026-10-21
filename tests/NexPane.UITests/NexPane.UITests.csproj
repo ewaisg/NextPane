@@ -2,10 +2,16 @@
 
   <PropertyGroup>
     <RootNamespace>NexPane.UITests</RootNamespace>
+    <!-- LibraryImport P/Invoke and an unmanaged resource-enumeration callback (AppIconTests). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NexPane.App\NexPane.App.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FlaUI.UIA3" />
   </ItemGroup>
 
 </Project>
