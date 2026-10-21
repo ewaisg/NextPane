@@ -1,22 +1,22 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-21 (h) by Subagent 6 (QA): P1.02 re-run after 61f0577 → rejected (4 consistency defects; mechanism itself verified).
+> Last update: 2026-10-21 (i) by Subagent 1: P1.02 consistency fixes after S6's e9e59ab (single HKCU-key rule everywhere) → `[READY_FOR_QA]`.
 
 ## 1. Executive summary
 
 NexPane is a production-grade, AI-powered Windows file explorer: C# / **.NET 10 LTS** / **WPF**, x64, unpackaged, Windows 10 1809+ and Windows 11, Inno Setup 6 installer, **proprietary license, shipped unsigned**.
 
-Phase 1 is complete except P1.02 (doc consistency fixes pending). The toolchain is installed. The git repository (`main`) and `NexPane.sln` exist, with 15 `src` projects layered per ARCHITECTURE §4, 16 xUnit v3 test projects and a benchmarks runner. The solution builds with 0 warnings and 0 errors, and 108 of 108 tests pass with the default filter. The app opens an empty window titled "NexPane". The IndexService is a Windows-service host skeleton that starts and stops cleanly. No feature code exists yet.
+Phase 1 is complete except P1.02, which is `[READY_FOR_QA]` after its consistency fixes. The toolchain is installed. The git repository (`main`) and `NexPane.sln` exist, with 15 `src` projects layered per ARCHITECTURE §4, 16 xUnit v3 test projects and a benchmarks runner. The solution builds with 0 warnings and 0 errors, and 108 of 108 tests pass with the default filter. The app opens an empty window titled "NexPane". The IndexService is a Windows-service host skeleton that starts and stops cleanly. No feature code exists yet.
 
 The build → test → publish → installer pipeline (P1.11) is scripted in `eng\` and verified end-to-end. The placeholder scanner (P1.12) is in place and runs inside the default test suite (default suite now 108 tests, incl. QA's `GitIgnoreTests`).
 
 **Phase 1 status:**
 - `[VERIFIED_COMPLETE]` (S6, 2026-10-21): P1.01, P1.03–P1.14 except P1.02 — 13 of 14.
-- `[IN_PROGRESS]`: **P1.02** (S6 reject after 61f0577). The uninstall user-data design below is verified against the Inno 6.7.3 help, but four places still contradict it: ARCHITECTURE §13.2 GPU row and TODO P6.30/P7.08 promise uninstaller removal in admin mode, and §19.3 vs P7.14/P4.43 disagree on whether an elevated per-user uninstall purges. Details in TODO.md P1.02.
+- `[READY_FOR_QA]`: **P1.02**. S6's 4 consistency defects are fixed (§13.2 GPU row, P6.30, P7.08, and one rule across §19.3, §21, P4.43 and P7.14). The uninstall user-data design (verified against the Inno 6.7.3 help):
   - Per-user data is removed by the app, per user (Settings › Privacy › "Remove my NexPane data…" / `--purge-user-data`, P4.43).
-  - The uninstaller purges only for per-user installs, via plain `Exec`, on an explicit Yes.
-  - Admin-mode uninstalls keep per-user data and tell the user how to remove it.
+  - **One rule for the uninstaller:** the purge is offered **if and only if** the uninstall key `…\Uninstall\{AppId}_is1` exists under the running account's **HKCU** (a per-user install owned by that account, elevated or not). It runs on an explicit Yes via plain `Exec`, never when silent. `IsAdminInstallMode` is not consulted.
+  - Otherwise (admin-mode install, or another account) the uninstaller keeps per-user data and tells the user how to remove it.
   - See ARCHITECTURE §19.3 and §21 "P1.02 rework".
 
 Phase 2 (S7, branding) and Phase 3 (S2, core systems, in its own worktree `.worktrees\phase3` on branch `phase3-core-search`) run in parallel. Do not edit that worktree from `main`.
@@ -34,9 +34,9 @@ Phase 2 (S7, branding) and Phase 3 (S2, core systems, in its own worktree `.work
 | `eng/common.ps1`, `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss` | Complete, `[READY_FOR_QA]` (P1.11); pipeline verified end-to-end → `dist\NexPane-Setup.exe` (52.8 MB). The `.iss` still needs the WebView2 bootstrapper and real branding in P7.08 |
 | `eng/check-placeholders.ps1`, `eng/placeholder-allowlist.json`, `tests/NexPane.Architecture.Tests/PlaceholderScannerTests.cs` | `[VERIFIED_COMPLETE]` (P1.12). QA owns the allowlist |
 | `.gitignore`, `THIRD-PARTY-NOTICES.txt`, ARCHITECTURE §22 / P1.14 sections | `[VERIFIED_COMPLETE]` (P1.07, P1.13, P1.08, P1.14). `.gitignore` is guarded by `tests/NexPane.Architecture.Tests/GitIgnoreTests.cs` |
-| `ARCHITECTURE.md` §19.3 + §21 (uninstall user-data handling), §13.2 GPU row, TODO P4.43 / P6.30 / P7.08 / P7.14 | `[IN_PROGRESS]` — P1.02 rework verified by S6 except 4 consistency defects (TODO.md P1.02) |
+| `ARCHITECTURE.md` §19.3 + §21 (uninstall user-data handling), §13.2 GPU row, TODO P4.43 / P6.30 / P7.08 / P7.14 | `[READY_FOR_QA]` — P1.02 consistency fixes by S1 (2026-10-21 i), waiting for the S6 re-run |
 | `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss`, `eng/placeholder-allowlist.json` | Cross-references reworded to "task(s) P1.11"; the allowlist is empty; scanner exit 0 |
-| Next up | S1: fix P1.02 (purge mechanism) → S6 re-run. In parallel: S7 Phase 2 (P2.01, P2.02), S2 Phase 3 (P3.01, P3.03) |
+| Next up | S6: re-run P1.02. In parallel: S7 Phase 2 (P2.01, P2.02), S2 Phase 3 (P3.01, P3.03) |
 
 ## 3. Environment setup
 
@@ -156,7 +156,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
     - **Resulting design** (ARCHITECTURE §19.3, §21 "P1.02 rework"):
       - per-user data is removed by the app (P4.43);
       - the uninstaller purges only for per-user installs (uninstall key under HKCU), via plain `Exec` (same credentials as the uninstaller) at `usUninstall`, on Yes only, never silent;
-      - in admin mode the uninstaller never deletes `{localappdata}`/`{userappdata}` content.
+      - the **only** discriminator is the `{AppId}_is1` uninstall key under the running account's HKCU (not `IsAdminInstallMode`); without it the uninstaller never deletes `{localappdata}`/`{userappdata}` content.
     - Verify any Inno API against the local help. `hh.exe -decompile` fails on paths over MAX_PATH, so decompile into a scratch folder using its 8.3 short path.
     - `.gitignore` regressions are caught by `GitIgnoreTests`.
 

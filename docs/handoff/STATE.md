@@ -1,14 +1,14 @@
 # NexPane — Current State
 
 > Updated by every subagent at the end of every session. Newest entry is at the top of the Session Log.
-> Last update: **2026-10-21 (h)** by **Subagent 6 (QA, Verification & Security Inspector)**: P1.02 re-verified after 61f0577 → rejected (4 consistency defects).
+> Last update: **2026-10-21 (i)** by **Subagent 1 (Lead Architect & State Scribe)**: P1.02 consistency fixes after S6's e9e59ab → `[READY_FOR_QA]`.
 > Roster (user-mandated numbering): S1 Architect & State Scribe · S2 Core Systems & Indexing Engine · S3 Native Windows Shell & OS Integration · S4 AI & Semantic Pipeline · S5 UI/UX & Workspace · **S6 QA, Verification & Security Inspector (veto)** · S7 Release & Installer Packaging (incl. icons/assets). Older log entries below that say "S7 QA role" refer to the QA role, which is now **S6**.
 
 ## 1. Snapshot
 
 | Item | Value |
 |---|---|
-| Current phase | **Phase 1 — NOT complete: 13/14 `[VERIFIED_COMPLETE]`; P1.02 `[IN_PROGRESS]`** (S6 reject after 61f0577: mechanism verified against the Inno 6.7.3 help, but §13.2 GPU row, P6.30 and P7.08 still promise uninstaller removal in admin mode, and §19.3 vs P7.14/P4.43 disagree on admin-vs-per-user precedence). Phase 2 (S7) and Phase 3 (S2, worktree `.worktrees\phase3`) continue in parallel |
+| Current phase | **Phase 1 — 13/14 `[VERIFIED_COMPLETE]`; P1.02 `[READY_FOR_QA]`**. S6's 4 consistency defects are fixed; one uninstall rule applies everywhere: the HKCU `{AppId}_is1` key alone decides whether a purge is offered. Phase 2 (S7) and Phase 3 (S2, worktree `.worktrees\phase3`) continue in parallel |
 | Placeholder scanner (P1.12) | `eng\check-placeholders.ps1` → **26 files, 0 violations, 0 allowlisted, 0 stale, exit 0**. The four `TODO P1.11` cross-references now read "task(s) P1.11"; `eng\placeholder-allowlist.json` has `"entries": []` |
 | Toolchain | .NET SDK 10.0.402, Git 2.55.0, Inno Setup 6.7.3 (per-user: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) |
 | Pipeline (P1.11) | `eng\build.ps1` → `eng\publish.ps1` → `eng\installer.ps1 -AllowMissingBranding` → unversioned `dist\NexPane-Setup.exe` (55.35 MB, ProductVersion 0.1.0; never executed) |
@@ -38,6 +38,17 @@ C:\Users\Ewais\Projects\NexPane\
 Package pins: Microsoft.Extensions.Hosting.WindowsServices 10.0.13, xunit.v3.mtp-v2 4.0.2, FluentAssertions [7.2.0], BenchmarkDotNet 0.15.8.
 
 ## 3. Just finished
+
+**2026-10-21 (i), S1: P1.02 consistency fixes (after S6 e9e59ab)**
+1. **ARCHITECTURE §13.2 GPU row.** Packs are removed via Settings › Transcription, via "Remove my NexPane data…"/`--purge-user-data` (P4.43), and by the uninstaller only for per-user installs on Yes. Admin-mode uninstalls keep them.
+2. **P6.30 acceptance.** Now covers (a) the in-app purge, (b) a per-user uninstall answering Yes, and (c) an admin-mode uninstall that keeps the packs.
+3. **P7.08 wording.** The purge prompt appears only when the uninstall key is under HKCU.
+4. **One rule.** Adopted S6's recommendation: the `…\Uninstall\{23676795-F60E-4EAF-95C6-C4D81BAD01C1}_is1` key under the running account's HKCU **alone** decides. `IsAdminInstallMode` is not consulted. An elevated same-account per-user uninstall purges on Yes; without the key (admin mode, or another account) the uninstaller never purges.
+   - Stated identically in §19.3 (rewritten as a single-rule bullet), the §21 "P1.02 rework" row, P4.43 (d) and P7.14 (3)/(4).
+   - New P7.14 cases: (f) elevated per-user uninstall by the same admin account → purge on Yes; (g) uninstaller started by a different account → no prompt, data kept.
+- §18 installer test row aligned.
+- Grep of `docs\` for uninstall + user data / purge / remove-data / runtimes: no remaining contradictions; historical log entries were left as history.
+- `check-placeholders.ps1` exit 0. Only the four handoff docs were changed and staged. `.worktrees\` untouched.
 
 **2026-10-21 (h), S6 QA: P1.02 re-run after 61f0577 → REJECTED**
 - Inno 6.7.3 help decompiled into the S6 scratchpad (8.3 path); all four quotations in §19.3/§21 confirmed verbatim (ExecAsOriginalUser not supported at uninstall; `Exec` uses Setup/Uninstall credentials; *Non Administrative Install Mode* "user-level files … handled by the application itself"; `IsAdminInstallMode` True when Uninstall runs with admin privileges). HKCU `{AppId}_is1` discriminator matches Inno key naming. §22 E3, P4.43, P7.14 consistent on the main flow.
@@ -94,7 +105,7 @@ TODO totals: 183 items: 9 VERIFIED_COMPLETE, 5 READY_FOR_QA, the rest PENDING.
 
 | Item | Owner | Status | Notes |
 |---|---|---|---|
-| P1.02 uninstall user-data mechanism | S6 | waiting (S1 → `[READY_FOR_QA]`) | Re-run: §19.3, the §21 "P1.02 rework" row, P4.43, P7.14 |
+| P1.02 uninstall user-data mechanism | S6 | waiting (S1 → `[READY_FOR_QA]`, 2026-10-21 i) | Re-run: §13.2 GPU row, §18 installer row, §19.3 single HKCU-key rule, §21 "P1.02 rework", P4.43 (d), P6.30, P7.08, P7.14 (3)/(4)/(f)/(g) |
 | Phase 2 (branding/assets) | **S7** | `[PENDING]` | Start with P2.01 (logo SVGs), then P2.02 (`tools\NexPane.AssetGen`) |
 | Phase 3 (core FS, indexer, search) | **S2** | `[PENDING]` | Start with P3.01 (VfsPath) and P3.03 (Storage migrations). Can run in parallel with Phase 2 now that `.gitignore` is safe |
 
@@ -134,6 +145,9 @@ Select-String -Path docs\handoff\ARCHITECTURE.md -Pattern 'ExecAsOriginalUser'  
 ```
 
 ## 7. Session log
+
+### 2026-10-21 (i) — Subagent 1 (Lead Architect & State Scribe)
+- Fixed S6's 4 P1.02 consistency defects; adopted the single HKCU `{AppId}_is1` rule in §19.3/§21/P4.43/P7.14; added P7.14 cases (f)/(g); aligned §13.2, §18, P6.30, P7.08. Placeholder scan exit 0. Docs-only commit.
 
 ### 2026-10-21 (h) — Subagent 6 (QA)
 - Re-verified P1.02 after S1 commit 61f0577 against the locally installed Inno 6.7.3 help (decompiled in the S6 scratchpad). Mechanism correct; rejected for 4 doc/acceptance inconsistencies (TODO.md P1.02). Worked only in the main checkout; staged only docs.
