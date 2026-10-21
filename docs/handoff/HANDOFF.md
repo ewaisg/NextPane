@@ -1,13 +1,13 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-21 (i) by Subagent 1: P1.02 consistency fixes after S6's e9e59ab (single HKCU-key rule everywhere) → `[READY_FOR_QA]`.
+> Last update: 2026-10-21 (j) by Subagent 6 (QA): P1.02 verified after 5f64ea8 — Phase 1 complete (14/14).
 
 ## 1. Executive summary
 
 NexPane is a production-grade, AI-powered Windows file explorer: C# / **.NET 10 LTS** / **WPF**, x64, unpackaged, Windows 10 1809+ and Windows 11, Inno Setup 6 installer, **proprietary license, shipped unsigned**.
 
-Phase 1 is complete except P1.02, which is `[READY_FOR_QA]` after its consistency fixes. The toolchain is installed. The git repository (`main`) and `NexPane.sln` exist, with 15 `src` projects layered per ARCHITECTURE §4, 16 xUnit v3 test projects and a benchmarks runner. The solution builds with 0 warnings and 0 errors, and 108 of 108 tests pass with the default filter. The app opens an empty window titled "NexPane". The IndexService is a Windows-service host skeleton that starts and stops cleanly. No feature code exists yet.
+**Phase 1 is complete** (14/14 `[VERIFIED_COMPLETE]`, S6, 2026-10-21). The toolchain is installed. The git repository (`main`) and `NexPane.sln` exist, with 15 `src` projects layered per ARCHITECTURE §4, 16 xUnit v3 test projects and a benchmarks runner. The solution builds with 0 warnings and 0 errors, and 108 of 108 tests pass with the default filter. The app opens an empty window titled "NexPane". The IndexService is a Windows-service host skeleton that starts and stops cleanly. No feature code exists yet.
 
 The build → test → publish → installer pipeline (P1.11) is scripted in `eng\` and verified end-to-end. The placeholder scanner (P1.12) is in place and runs inside the default test suite (default suite now 108 tests, incl. QA's `GitIgnoreTests`).
 
@@ -25,18 +25,18 @@ Phase 2 (S7, branding) and Phase 3 (S2, core systems, in its own worktree `.work
 
 | File / area | State |
 |---|---|
-| `docs/handoff/*.md`, `README.md`, `.gitignore` | Complete, `[READY_FOR_QA]` |
-| `LICENSE.txt` (proprietary EULA), `THIRD-PARTY-NOTICES.txt` | Complete, `[READY_FOR_QA]` (P1.13); full license texts are appended at P7.06 |
-| `NexPane.sln`, `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`, `.gitattributes` | Complete, `[READY_FOR_QA]` (P1.09) |
+| `docs/handoff/*.md`, `README.md`, `.gitignore` | Complete, `[VERIFIED_COMPLETE]` |
+| `LICENSE.txt` (proprietary EULA), `THIRD-PARTY-NOTICES.txt` | Complete, `[VERIFIED_COMPLETE]` (P1.13); full license texts are appended at P7.06 |
+| `NexPane.sln`, `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`, `.gitattributes` | Complete, `[VERIFIED_COMPLETE]` (P1.09) |
 | `src/*` | Project shells only (no code), except `NexPane.App` (MainWindow) and `NexPane.IndexService` (`Program.BuildHost`) |
-| `tests/NexPane.Architecture.Tests` | Layering + convention tests, `[READY_FOR_QA]` (P1.10) |
+| `tests/NexPane.Architecture.Tests` | Layering + convention tests, `[VERIFIED_COMPLETE]` (P1.10) |
 | `tests/Shared/ModuleAssembly.cs` | Shared helper linked into every `*Tests` project (x64 / target framework assertions) |
-| `eng/common.ps1`, `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss` | Complete, `[READY_FOR_QA]` (P1.11); pipeline verified end-to-end → `dist\NexPane-Setup.exe` (52.8 MB). The `.iss` still needs the WebView2 bootstrapper and real branding in P7.08 |
+| `eng/common.ps1`, `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss` | Complete, `[VERIFIED_COMPLETE]` (P1.11); pipeline verified end-to-end → `dist\NexPane-Setup.exe` (52.8 MB). The `.iss` still needs the WebView2 bootstrapper and real branding in P7.08 |
 | `eng/check-placeholders.ps1`, `eng/placeholder-allowlist.json`, `tests/NexPane.Architecture.Tests/PlaceholderScannerTests.cs` | `[VERIFIED_COMPLETE]` (P1.12). QA owns the allowlist |
 | `.gitignore`, `THIRD-PARTY-NOTICES.txt`, ARCHITECTURE §22 / P1.14 sections | `[VERIFIED_COMPLETE]` (P1.07, P1.13, P1.08, P1.14). `.gitignore` is guarded by `tests/NexPane.Architecture.Tests/GitIgnoreTests.cs` |
-| `ARCHITECTURE.md` §19.3 + §21 (uninstall user-data handling), §13.2 GPU row, TODO P4.43 / P6.30 / P7.08 / P7.14 | `[READY_FOR_QA]` — P1.02 consistency fixes by S1 (2026-10-21 i), waiting for the S6 re-run |
+| `ARCHITECTURE.md` §19.3 + §21 (uninstall user-data handling), §13.2 GPU row, TODO P4.43 / P6.30 / P7.08 / P7.14 | `[VERIFIED_COMPLETE]` (P1.02, S6 2026-10-21 after 5f64ea8); implementation work is P4.43 (S3) and P7.14 (S7) |
 | `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss`, `eng/placeholder-allowlist.json` | Cross-references reworded to "task(s) P1.11"; the allowlist is empty; scanner exit 0 |
-| Next up | S6: re-run P1.02. In parallel: S7 Phase 2 (P2.01, P2.02), S2 Phase 3 (P3.01, P3.03) |
+| Next up | Phase 1 closed. S7 Phase 2 (`.worktrees\phase2`), S2 Phase 3 (`.worktrees\phase3`); S6 verifies each `[READY_FOR_QA]` item (P2.09, P3.36 gates) |
 
 ## 3. Environment setup
 

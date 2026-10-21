@@ -1,14 +1,14 @@
 # NexPane — Current State
 
 > Updated by every subagent at the end of every session. Newest entry is at the top of the Session Log.
-> Last update: **2026-10-21 (i)** by **Subagent 1 (Lead Architect & State Scribe)**: P1.02 consistency fixes after S6's e9e59ab → `[READY_FOR_QA]`.
+> Last update: **2026-10-21 (j)** by **Subagent 6 (QA, Verification & Security Inspector)**: P1.02 verified after 5f64ea8 — **Phase 1 complete (14/14)**.
 > Roster (user-mandated numbering): S1 Architect & State Scribe · S2 Core Systems & Indexing Engine · S3 Native Windows Shell & OS Integration · S4 AI & Semantic Pipeline · S5 UI/UX & Workspace · **S6 QA, Verification & Security Inspector (veto)** · S7 Release & Installer Packaging (incl. icons/assets). Older log entries below that say "S7 QA role" refer to the QA role, which is now **S6**.
 
 ## 1. Snapshot
 
 | Item | Value |
 |---|---|
-| Current phase | **Phase 1 — 13/14 `[VERIFIED_COMPLETE]`; P1.02 `[READY_FOR_QA]`**. S6's 4 consistency defects are fixed; one uninstall rule applies everywhere: the HKCU `{AppId}_is1` key alone decides whether a purge is offered. Phase 2 (S7) and Phase 3 (S2, worktree `.worktrees\phase3`) continue in parallel |
+| Current phase | **Phase 1 — COMPLETE: 14/14 `[VERIFIED_COMPLETE]`** (S6, 2026-10-21, after 5f64ea8). Phase 2 (S7) and Phase 3 (S2, worktree `.worktrees\phase3`) in progress |
 | Placeholder scanner (P1.12) | `eng\check-placeholders.ps1` → **26 files, 0 violations, 0 allowlisted, 0 stale, exit 0**. The four `TODO P1.11` cross-references now read "task(s) P1.11"; `eng\placeholder-allowlist.json` has `"entries": []` |
 | Toolchain | .NET SDK 10.0.402, Git 2.55.0, Inno Setup 6.7.3 (per-user: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) |
 | Pipeline (P1.11) | `eng\build.ps1` → `eng\publish.ps1` → `eng\installer.ps1 -AllowMissingBranding` → unversioned `dist\NexPane-Setup.exe` (55.35 MB, ProductVersion 0.1.0; never executed) |
@@ -38,6 +38,12 @@ C:\Users\Ewais\Projects\NexPane\
 Package pins: Microsoft.Extensions.Hosting.WindowsServices 10.0.13, xunit.v3.mtp-v2 4.0.2, FluentAssertions [7.2.0], BenchmarkDotNet 0.15.8.
 
 ## 3. Just finished
+
+**2026-10-21 (j), S6 QA: P1.02 → `[VERIFIED_COMPLETE]`; Phase 1 complete**
+- The 4 consistency defects from e9e59ab are fixed in 5f64ea8 (§13.2 GPU row, P6.30, P7.08, single HKCU `{AppId}_is1` rule in §19.3/§21/P4.43(d)/P7.14(3)(4) + cases (f)/(g)). Rule premise confirmed in the installed Inno 6.7.3 help (*Non Administrative Install Mode*: with admin rights available, a non-admin install's uninstaller "will always be marked as requiring administrative privileges").
+- Grep of docs/README/`.iss` for uninstall/remove-data/runtimes/`ExecAsOriginalUser`/`IsAdminInstallMode`: no remaining contradiction (history entries and "current `.iss` state" notes are accurate).
+- `eng\build.ps1` exit 0: 0 warnings, 0 errors, **108/108** tests; `eng\check-placeholders.ps1` exit 0 (26 files, 0 violations, 0 allowlisted).
+
 
 **2026-10-21 (i), S1: P1.02 consistency fixes (after S6 e9e59ab)**
 1. **ARCHITECTURE §13.2 GPU row.** Packs are removed via Settings › Transcription, via "Remove my NexPane data…"/`--purge-user-data` (P4.43), and by the uninstaller only for per-user installs on Yes. Admin-mode uninstalls keep them.
@@ -101,6 +107,8 @@ TODO totals: 183 items: 9 VERIFIED_COMPLETE, 5 READY_FOR_QA, the rest PENDING.
 
 ## 4. Active work
 
+> S6 (2026-10-21 j): Phase 1 closed. Next QA gates: P2.09 (Phase 2, S7 worktree `.worktrees\phase2`) and P3.36 (Phase 3, S2 worktree `.worktrees\phase3`) when their items reach `[READY_FOR_QA]`; every merge to `main` must keep `eng\build.ps1` and `eng\check-placeholders.ps1` green.
+
 > S6 (2026-10-21 h): next for S1 — fix the 4 P1.02 consistency defects listed in TODO.md P1.02 / §3 above, set `[READY_FOR_QA]`, S6 re-runs (doc-only check).
 
 | Item | Owner | Status | Notes |
@@ -145,6 +153,9 @@ Select-String -Path docs\handoff\ARCHITECTURE.md -Pattern 'ExecAsOriginalUser'  
 ```
 
 ## 7. Session log
+
+### 2026-10-21 (j) — Subagent 6 (QA)
+- Re-verified P1.02 after 5f64ea8 (diff review, Inno help check in the S6 scratchpad, doc grep, full build + default suite + placeholder scan). VERIFIED → Phase 1 complete (14/14). Only TODO/STATE/HANDOFF changed; `.worktrees\` untouched.
 
 ### 2026-10-21 (i) — Subagent 1 (Lead Architect & State Scribe)
 - Fixed S6's 4 P1.02 consistency defects; adopted the single HKCU `{AppId}_is1` rule in §19.3/§21/P4.43/P7.14; added P7.14 cases (f)/(g); aligned §13.2, §18, P6.30, P7.08. Placeholder scan exit 0. Docs-only commit.
