@@ -1,7 +1,7 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-21 by Subagent 7 (Release & Installer Packaging, P1.11).
+> Last update: 2026-10-21 (d) by the QA Inspector (S7 QA role): Phase 1 audit + P1.12 placeholder scanner.
 
 ## 1. Executive summary
 
@@ -9,7 +9,9 @@ NexPane is a production-grade, AI-powered Windows file explorer: C# / **.NET 10 
 
 Phase 1 is complete up to QA. The toolchain is installed. The git repository (`main`) and `NexPane.sln` exist, with 15 `src` projects layered per ARCHITECTURE §4, 16 xUnit v3 test projects and a benchmarks runner. The solution builds with 0 warnings and 0 errors, and 47 of 47 tests pass. The app opens an empty window titled "NexPane". The IndexService is a Windows-service host skeleton that starts and stops cleanly. No feature code exists yet.
 
-The build → test → publish → installer pipeline (P1.11) is scripted in `eng\` and verified end-to-end. Next: P1.12 (the placeholder scanner), then Phase 2 (branding, S2) and Phase 3 (core FS, indexer and search, S3), which can run in parallel.
+The build → test → publish → installer pipeline (P1.11) is scripted in `eng\` and verified end-to-end. The placeholder scanner (P1.12) is in place and runs inside the default test suite (now 80 tests).
+
+**QA audit (2026-10-21): Phase 1 is NOT complete.** P1.01, P1.03–P1.06, P1.09–P1.12 are `[VERIFIED_COMPLETE]`; P1.02, P1.07, P1.08 and P1.13 were rejected back to S1 (defects inline in TODO.md), and P1.14 was added. Fix P1.07 (`.gitignore` swallows `Models/`, `Secrets/`, `Packages/`, `Log(s)/` folders) **before** Phase 2 (S2) and Phase 3 (S3) start in parallel.
 
 ## 2. Files currently being worked on
 
@@ -22,7 +24,9 @@ The build → test → publish → installer pipeline (P1.11) is scripted in `en
 | `tests/NexPane.Architecture.Tests` | Layering + convention tests, `[READY_FOR_QA]` (P1.10) |
 | `tests/Shared/ModuleAssembly.cs` | Shared helper linked into every `*Tests` project (x64 / target framework assertions) |
 | `eng/common.ps1`, `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss` | Complete, `[READY_FOR_QA]` (P1.11); pipeline verified end-to-end → `dist\NexPane-Setup.exe` (52.8 MB). The `.iss` still needs the WebView2 bootstrapper and real branding in P7.08 |
-| Next up | `eng/check-placeholders.ps1` (P1.12) |
+| `eng/check-placeholders.ps1`, `eng/placeholder-allowlist.json`, `tests/NexPane.Architecture.Tests/PlaceholderScannerTests.cs` | `[VERIFIED_COMPLETE]` (P1.12). QA owns the allowlist |
+| `.gitignore`, `ARCHITECTURE.md` (§2, §19.3, header, §22), `THIRD-PARTY-NOTICES.txt` | `[IN_PROGRESS]` — QA rejections P1.07, P1.02/P1.08, P1.13 (S1) |
+| Next up | S1: P1.07 → P1.13 → P1.02/P1.08 → P1.14; then S2 Phase 2 and S3 Phase 3 in parallel |
 
 ## 3. Environment setup
 
@@ -68,7 +72,9 @@ Initialization is done (commit `c6b4d4f`). The repo was scaffolded by hand rathe
 dotnet build NexPane.sln -c Release
 
 # Test. global.json selects Microsoft.Testing.Platform, so use --solution and xUnit v3 trait filters.
-# Default CI filter (Elevated and Live suites are opt-in) — verified 47/47 passing:
+# Placeholder scanner (P1.12; also runs inside the default suite) — exit 0 clean, 1 violations, 2 allowlist error:
+powershell -NoProfile -ExecutionPolicy Bypass -File eng\check-placeholders.ps1
+# Default CI filter (Elevated and Live suites are opt-in) — verified 80/80 passing (QA, 2026-10-21):
 dotnet test --solution NexPane.sln -c Release --filter-not-trait "Category=Elevated" --filter-not-trait "Category=Live"
 # Elevated suite (from an elevated terminal):
 dotnet test --solution NexPane.sln -c Release --filter-trait "Category=Elevated"
@@ -130,10 +136,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
 19. **Analyzers:** `AnalysisLevel=latest-recommended` with warnings as errors. CA2007 (`ConfigureAwait`) is enforced in libraries but disabled in `NexPane.App` and in tests. Executable types should be `internal`; WPF XAML uses `x:ClassModifier="internal"`.
 20. **GPU Whisper** runtimes (CUDA and Vulkan) are optional downloads into `%LOCALAPPDATA%\NexPane\runtimes\`. They are never bundled in the installer, and loading must always fall back to CPU without crashing (ARCHITECTURE §13.2).
 21. **Inno Setup 6.7.3** is installed. ISPP `RemoveBackslash` is deprecated (it causes a warning, which fails `eng/installer.ps1`), so use `RemoveBackslashUnlessRoot`. Language-specific custom messages use a dot (`english.Name=`), not a colon. ISCC writes compile errors to stderr. Index Service setup lives in the `.iss` `[Code]` section (ARCHITECTURE §21), not in `[Run]`.
+22. **`.gitignore` pitfall (QA, P1.07 open):** the repo has `core.ignorecase=true` and unanchored `models/`, `secrets/`, `packages/`, `[Ll]og(s)/` patterns, so a folder like `src/NexPane.Core/Models/` is silently ignored. Until P1.07 is fixed, run `git status --ignored` after adding folders. Long scratch paths (> 260 chars, e.g. the agent scratchpad) make `dotnet` fail with "The directory name is invalid"; use a short `%TEMP%\...` folder for throwaway projects.
 
 ## 7. Working rules
 
-- **Zero-placeholder rule.** No `TODO`/`FIXME`/`NotImplementedException`, stub returns, fake data, lorem ipsum or commented-out features in `src/`, and do not write the word "TODO" in source comments (use "task P3.13" instead). If something cannot be done, mark the TODO item `[BLOCKED]` with the reason; do not ship a stub. `eng/check-placeholders.ps1` (P1.12) will enforce this.
+- **Zero-placeholder rule.** No `TODO`/`FIXME`/`NotImplementedException`, stub returns, fake data, lorem ipsum or commented-out features in `src/`, and do not write the word "TODO" in source comments (use "task P3.13" instead). If something cannot be done, mark the TODO item `[BLOCKED]` with the reason; do not ship a stub. **Enforced** by `eng/check-placeholders.ps1` (P1.12) over `src/`, `tools/`, `installer/`, `eng/` — run it directly, or it fails `Repository_has_no_placeholders_stubs_or_fake_work` in the default test suite. Rules PH001–PH008 (markers, NotImplementedException, placeholder text, message-less `NotSupportedException()`, empty/comment-only catch, `Task.Delay`/`Thread.Sleep` in non-test C#, Console/Debug-only event handlers, mock/fake/dummy/stub/sample data). A legitimate hit (e.g. retry backoff `Task.Delay`) needs an entry in `eng/placeholder-allowlist.json` (path + rule + ≥ 10-char literal line fragment + ≥ 20-char justification), added by QA; stale entries fail the scan (exit 2). Test code under `tests/` is not scanned.
 - **Status discipline.** Owners move items `[PENDING] → [IN_PROGRESS] → [READY_FOR_QA]` (or `[BLOCKED]`). **Only Subagent 7 (QA) sets `[VERIFIED_COMPLETE]`.**
 - **Session-end rule.** **No subagent ends a session without updating `STATE.md` (snapshot, just finished, active work, issues, exact next commands, session log), `TODO.md` (status tags) and `HANDOFF.md` (files being worked on, new gotchas).**
 - **Commits.** Commit at the end of each work item with a descriptive message ending in `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. No remote, no push.
