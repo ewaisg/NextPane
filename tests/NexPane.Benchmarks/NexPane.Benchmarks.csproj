@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>NexPane.Benchmarks</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NexPane.Core\NexPane.Core.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.Indexing\NexPane.Indexing.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.Search\NexPane.Search.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+  </ItemGroup>
+
+</Project>

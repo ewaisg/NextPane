@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>NexPane.Preview</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NexPane.Core\NexPane.Core.csproj" />
+    <ProjectReference Include="..\NexPane.Shell\NexPane.Shell.csproj" />
+  </ItemGroup>
+
+</Project>

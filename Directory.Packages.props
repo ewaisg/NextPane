@@ -1,0 +1,16 @@
+<Project>
+  <!-- Central package management. Versions are pinned here only; csproj files use <PackageReference Include="..." /> without Version.
+       Feature packages from ARCHITECTURE.md §15 are added by the phase that first uses them. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup Label="Hosting">
+    <PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.13" />
+  </ItemGroup>
+  <ItemGroup Label="Tests and benchmarks">
+    <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.2" />
+    <!-- Pinned: FluentAssertions 8+ is commercially licensed (Xceed). Do not upgrade. -->
+    <PackageVersion Include="FluentAssertions" Version="[7.2.0]" />
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+  </ItemGroup>
+</Project>

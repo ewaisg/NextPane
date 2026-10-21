@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>NexPane.Search</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NexPane.Core\NexPane.Core.csproj" />
+    <ProjectReference Include="..\NexPane.Storage\NexPane.Storage.csproj" />
+  </ItemGroup>
+
+</Project>

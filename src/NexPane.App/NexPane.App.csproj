@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>NexPane.App</RootNamespace>
+    <AssemblyName>NexPane</AssemblyName>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NexPane.Core\NexPane.Core.csproj" />
+    <ProjectReference Include="..\NexPane.Shell\NexPane.Shell.csproj" />
+    <ProjectReference Include="..\NexPane.Storage\NexPane.Storage.csproj" />
+    <ProjectReference Include="..\NexPane.Security\NexPane.Security.csproj" />
+    <ProjectReference Include="..\NexPane.Indexing\NexPane.Indexing.csproj" />
+    <ProjectReference Include="..\NexPane.Search\NexPane.Search.csproj" />
+    <ProjectReference Include="..\NexPane.Archives\NexPane.Archives.csproj" />
+    <ProjectReference Include="..\NexPane.Network\NexPane.Network.csproj" />
+    <ProjectReference Include="..\NexPane.Sync\NexPane.Sync.csproj" />
+    <ProjectReference Include="..\NexPane.Metadata\NexPane.Metadata.csproj" />
+    <ProjectReference Include="..\NexPane.Scripting\NexPane.Scripting.csproj" />
+    <ProjectReference Include="..\NexPane.AI\NexPane.AI.csproj" />
+    <ProjectReference Include="..\NexPane.Preview\NexPane.Preview.csproj" />
+  </ItemGroup>
+
+</Project>

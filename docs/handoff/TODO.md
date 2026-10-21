@@ -1,0 +1,270 @@
+# NexPane — Master TODO
+
+> Source of truth for work status. Update the status tag in place; never delete items (strike through with a reason if descoped, after user approval).
+> Design reference: `docs/handoff/ARCHITECTURE.md` (section numbers in brackets, e.g. [§7.2]).
+
+## Status tags
+
+| Tag | Meaning | Who may set it |
+|---|---|---|
+| `[PENDING]` | Not started | anyone |
+| `[IN_PROGRESS]` | Being worked on now (must match `STATE.md` "Active work") | owner |
+| `[BLOCKED]` | Cannot proceed; reason + blocking item id required inline | owner |
+| `[READY_FOR_QA]` | Owner believes acceptance test passes; evidence (test name / command output) noted in `STATE.md` | owner |
+| `[VERIFIED_COMPLETE]` | QA re-ran the acceptance test and it passed | **Subagent 7 only** |
+
+## Roster (owners)
+
+| Id | Role | Phase focus |
+|---|---|---|
+| S1 | Subagent 1 — Lead Architect & State Scribe | Phase 1, doc stewardship throughout |
+| S2 | Subagent 2 — Branding & Asset Engineer | Phase 2 |
+| S3 | Subagent 3 — Core FS, Indexing & Search Engineer | Phase 3 |
+| S4 | Subagent 4 — Shell UI & Native Integration Engineer | Phase 4 |
+| S5 | Subagent 5 — Power Tools Engineer | Phase 5 |
+| S6 | Subagent 6 — AI Integration Engineer | Phase 6 |
+| S7 | Subagent 7 — QA Auditor & Release Engineer | Phase 7, verification of every phase |
+| ORC | Orchestrator (main session) | Toolchain, repo init, cross-agent coordination |
+
+## Global rules (apply to every item)
+- Zero-placeholder rule: no `TODO`, `NotImplementedException`, stub returns, lorem ipsum, fake data or commented-out features in shipped code paths. `eng/check-placeholders.ps1` (P1.12) must pass.
+- Every item's acceptance test must be automated unless marked *(manual)*; manual checks are recorded in `STATE.md` with date and result.
+- No agent ends a session without updating `STATE.md`, `TODO.md`, and `HANDOFF.md`.
+
+---
+
+## Phase 1 — Architecture / Stack Lock / Handoff Init
+
+- `[IN_PROGRESS]` **P1.01** Toolchain install: .NET 10 SDK (`Microsoft.DotNet.SDK.10`), Inno Setup 6 (`JRSoftware.InnoSetup`), Git (`Git.Git`) — *Owner:* ORC — *Accept:* `dotnet --list-sdks` shows `10.0.x`; `git --version` succeeds; `Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"` (or `$env:ProgramFiles\Inno Setup 6\ISCC.exe`) is `True`.
+- `[READY_FOR_QA]` **P1.02** `docs/handoff/ARCHITECTURE.md` — stack rationale, layout, boundaries, threading, Mermaid flows, SQL schema, interfaces, packages/licenses, security, budgets, testing, risks — *Owner:* S1 — *Accept:* QA checklist: all 22 sections present; every scope item A–E maps to a section (traceability table in P1.08); every Mermaid block renders in a Mermaid live renderer *(manual)*; SQL in §9 executes without error in `sqlite3` with FTS5 (`Get-Content` the blocks → `sqlite3 :memory:`).
+- `[READY_FOR_QA]` **P1.03** `docs/handoff/TODO.md` (this file) — *Owner:* S1 — *Accept:* every item has status tag, id, owner, acceptance test; phases 1–7 named exactly as specified.
+- `[READY_FOR_QA]` **P1.04** `docs/handoff/STATE.md` — *Owner:* S1 — *Accept:* contains what exists, last finished, active issues, exact next commands.
+- `[READY_FOR_QA]` **P1.05** `docs/handoff/HANDOFF.md` — *Owner:* S1 — *Accept:* contains env setup (winget ids), build/test/publish/installer commands, gotchas, zero-placeholder rule, roster, session-end rule, current files.
+- `[READY_FOR_QA]` **P1.06** `README.md` — *Owner:* S1 — *Accept:* overview + links to all four handoff docs resolve.
+- `[READY_FOR_QA]` **P1.07** `.gitignore` for .NET/VS + `build/`, `dist/`; assets (`*.ico`, `*.png`, `*.bmp` under `assets/`) NOT ignored — *Owner:* S1 — *Accept:* after repo init, `git check-ignore -v assets/icons/NexPane.ico` returns nothing (exit 1) and `git check-ignore build/x dist/y` both match.
+- `[READY_FOR_QA]` **P1.08** Requirements traceability matrix appended to ARCHITECTURE.md §22 (scope item → section → TODO ids) — *Owner:* S1 — *Accept:* every bullet of scope A–E appears with at least one TODO id.
+- `[PENDING]` **P1.09** Initialize git repo + solution + test framework: `git init`, `.gitattributes` (`* text=auto eol=crlf`, binaries `-text`), `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`, `NexPane.sln` with all `src/` and `tests/` projects from ARCHITECTURE §3 (empty projects compile), first commit — *Owner:* ORC — *Accept:* `dotnet build NexPane.sln -c Release` → 0 warnings/0 errors; `dotnet test NexPane.sln` runs ≥ 1 smoke test per test project and passes; `git log --oneline` shows the initial commit.
+- `[PENDING]` **P1.10** Architecture tests for layer rules [§4] — *Owner:* S1 — *Accept:* `NexPane.Architecture.Tests` contains one test per rule; deliberately adding a `NexPane.Search → NexPane.Indexing` reference makes it fail (verified once, then reverted).
+- `[PENDING]` **P1.11** `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1` — *Owner:* S1 — *Accept:* each script runs end-to-end with `-WhatIf`-style dry-run flag printing the exact commands from HANDOFF.md; non-zero exit propagates on failure.
+- `[PENDING]` **P1.12** `eng/check-placeholders.ps1` — scans `src/` for `TODO`, `FIXME`, `NotImplementedException`, `lorem`, `placeholder` (case-insensitive) — *Owner:* S1 — *Accept:* exits 1 on a planted sample file in a temp copy, 0 on clean tree.
+- `[PENDING]` **P1.13** `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt` skeleton with all packages from §15 — *Owner:* S1 — *Accept:* every `PackageVersion` in `Directory.Packages.props` has an entry; blocked on user answer Q1 for NexPane's own license text.
+
+---
+
+## Phase 2 — Branding & Assets
+
+- `[PENDING]` **P2.01** Author `assets/brand/nexpane-logo.svg` and `nexpane-mark.svg` (simplified ≤ 32 px variant) — *Owner:* S2 — *Accept:* both files are valid SVG 1.1 (parse with Svg.Skia without warnings), viewBox square, no external references/fonts (text converted to paths), legible at 16 px *(manual review of rendered PNG)*.
+- `[PENDING]` **P2.02** `tools/NexPane.AssetGen` console project (SkiaSharp + Svg.Skia) with CLI `AssetGen --svg <file> --mark <file> --out assets` — *Owner:* S2 — *Accept:* running it produces all files listed in P2.03–P2.06; exit code 0; second run yields byte-identical outputs (SHA-256 compared in test `AssetGenDeterminismTests`).
+- `[PENDING]` **P2.03** PNG exports 16, 20, 24, 32, 40, 48, 64, 128, 256 — *Owner:* S2 — *Accept:* test asserts dimensions and 32-bpp alpha for each.
+- `[PENDING]` **P2.04** ICO writer + `assets/icons/NexPane.ico` containing 16, 20, 24, 32, 40, 48, 64, 128, 256 (256 PNG-compressed) — *Owner:* S2 — *Accept:* test parses ICONDIR and finds each size; `System.Drawing.Icon` loads every size; Explorer displays icon correctly at Large/Extra-large views *(manual)*.
+- `[PENDING]` **P2.05** `assets/icons/tray.ico` (16, 20, 24, 32, 40, 48) light and dark variants (`tray-light.ico`, `tray-dark.ico`) — *Owner:* S2 — *Accept:* test verifies sizes; contrast ratio of glyph vs taskbar background ≥ 3:1 computed in test for both themes.
+- `[PENDING]` **P2.06** Inno wizard bitmaps: `wizard-164x314.bmp`, `wizard-205x393.bmp`, `wizard-246x471.bmp`, `wizard-287x550.bmp`, `wizard-328x628.bmp`, `wizard-small-55.bmp`, `-69`, `-83`, `-97`, `-110` (24-bit BMP) — *Owner:* S2 — *Accept:* test reads BMP headers: bit depth 24, exact dimensions.
+- `[PENDING]` **P2.07** App icon wiring: `<ApplicationIcon>` in NexPane.App and IndexService csproj; window `Icon`; tray icon (`NotifyIcon` via Shell_NotifyIconW in NexPane.Shell) — *Owner:* S2 (with S4) — *Accept:* `ExtractIconEx` on built exe returns ≥ 1 icon; FlaUI test reads main window icon non-null.
+- `[PENDING]` **P2.08** Theme accent palette derived from logo (tokens for Dark/Light) committed to `src/NexPane.App/Themes/Tokens.xaml` values — *Owner:* S2 — *Accept:* contrast test: text on surface ≥ 4.5:1, accent on surface ≥ 3:1 in both themes.
+- `[PENDING]` **P2.09** QA verification of Phase 2 — *Owner:* S7 — *Accept:* all P2 tests green; manual icon review recorded in STATE.md.
+
+---
+
+## Phase 3 — Core FS, Indexer & Search
+
+### 3A Core & storage
+- `[PENDING]` **P3.01** `VfsPath` parse/print/combine/parent for all schemes [§10.1] — *Owner:* S3 — *Accept:* `VfsPathTests` ≥ 40 cases incl. UNC, `\\?\`, archive nesting, IPv6 hosts, percent-encoding round-trip.
+- `[PENDING]` **P3.02** `LocalFileSystemProvider` (`file:`) with `\\?\` long path support, hidden/system filtering, symlink/junction kinds — *Owner:* S3 — *Accept:* integration tests on temp dir with 300-char path, junction, symlink (created with `CreateSymbolicLinkW` + `SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE`, skipped if Developer Mode off).
+- `[PENDING]` **P3.03** `NexPane.Storage`: connection factory (WAL, pragmas), migration runner, `index.db`/`app.db` v1 schemas exactly as §9 — *Owner:* S3 — *Accept:* `MigrationTests` create both DBs from empty, assert `user_version=1` and every table/trigger exists; FTS5 insert/delete/update triggers keep `doc_text_fts` consistent (`'integrity-check'` command passes).
+- `[PENDING]` **P3.04** `settings.json` service with schema version, atomic write (`File.Replace`), change notifications — *Owner:* S3 — *Accept:* tests: corrupt file → defaults + backup copy; concurrent writes serialize; kill-during-write simulation leaves valid file.
+
+### 3B In-memory index
+- `[PENDING]` **P3.05** `IndexStore` struct-of-arrays segments, name + folded arenas, generations, tombstones [§7.1] — *Owner:* S3 — *Accept:* unit tests for add/remove/rename/modify; concurrent reader test (8 reader threads + 1 writer, 1M ops) finds no torn reads; memory benchmark ≤ 160 MB per 1M synthetic entries.
+- `[PENDING]` **P3.06** Compaction with result remap — *Owner:* S3 — *Accept:* after 30 % deletes, compaction runs; live query results remain correct (test compares against brute-force recompute).
+- `[PENDING]` **P3.07** Path reconstruction + directory path LRU — *Owner:* S3 — *Accept:* tests on deep (200-level) trees; benchmark 1M `GetFullPath` calls ≤ 400 ms.
+- `[PENDING]` **P3.08** Snapshot persist/load (`entries`, `volumes`) batched every 5 s — *Owner:* S3 — *Accept:* round-trip test of 1M entries; load benchmark ≤ 2 s.
+
+### 3C Volume sources & watchers
+- `[PENDING]` **P3.09** USN record parsing (V2/V3/V4) from captured binary fixtures — *Owner:* S3 — *Accept:* parser tests over fixtures in `tests/TestAssets/usn/`; malformed lengths rejected without exceptions escaping.
+- `[PENDING]` **P3.10** `FSCTL_ENUM_USN_DATA` enumerator + `FSCTL_READ_USN_JOURNAL` tail (in-proc elevated mode) — *Owner:* S3 — *Accept:* `[Elevated]` test on a mounted test VHDX: create 10k files → enumeration count matches; rename/delete reflected via journal within 1 s.
+- `[PENDING]` **P3.11** Raw `$MFT` reader (data runs, fixups, `$STANDARD_INFORMATION`, `$FILE_NAME`, unnamed `$DATA` size) — *Owner:* S3 — *Accept:* `[Elevated]` test: sizes/mtimes for 10k VHDX files equal `GetFileInformationByHandleEx` values; fixture-based unit tests for resident/non-resident and attribute-list records.
+- `[PENDING]` **P3.12** Journal resume (`journal_id`, `last_usn`) and re-enumeration on journal reset — *Owner:* S3 — *Accept:* `[Elevated]` test deletes/recreates journal (`fsutil usn deletejournal`) → full rescan triggered and index correct.
+- `[PENDING]` **P3.13** `NexPane.IndexService` worker + pipe protocol [§7.5] — *Owner:* S3 — *Accept:* protocol round-trip unit tests; frame parser fuzz test (100k random frames, no crash, no unbounded allocation); `[Elevated]` integration: service running under `sc create` test name streams a VHDX volume to a non-elevated client.
+- `[PENDING]` **P3.14** Service-side `AccessCheck` filtering by client token — *Owner:* S3 — *Accept:* `[Elevated]` test: directory with ACL denying the test user → its children absent from client stream; accessible siblings present.
+- `[PENDING]` **P3.15** `WalkerVolumeSource` parallel walker (`FindFirstFileExW` LARGE_FETCH) — *Owner:* S3 — *Accept:* counts match `Get-ChildItem -Recurse -Force` on a generated 200k-file tree; throughput benchmark ≥ 50k entries/s warm.
+- `[PENDING]` **P3.16** `RdcwWatcher` (`ReadDirectoryChangesExW` extended info, overflow → subtree rewalk) — *Owner:* S3 — *Accept:* tests: create/rename/delete reflected ≤ 1 s; forced overflow (100k creates with 4 KB buffer in test mode) triggers rewalk and final index is correct.
+- `[PENDING]` **P3.17** Source selection logic (service → in-proc elevated → walker) with UI-visible status — *Owner:* S3 — *Accept:* unit tests with fakes for each branch; `VolumeStatus.Source` correct.
+- `[PENDING]` **P3.18** `NetworkCrawler` for UNC/mapped drives (throttled, scheduled, mtime pruning) — *Owner:* S3 — *Accept:* test against `\\localhost\C$`-free local share created in test setup (`New-SmbShare`, `[Elevated]`) or a temp dir via `\\?\UNC\localhost\...` admin share fallback; changed subtree detected on next crawl; max 4 concurrent listings verified via counter.
+
+### 3D Query language & search
+- `[PENDING]` **P3.19** Lexer + parser + diagnostics with spans for grammar §8.1 — *Owner:* S3 — *Accept:* ≥ 150 parser test cases incl. precedence (`a b | c` = `(a AND b) OR c`), `NOT` binding, quoted escapes, invalid inputs producing diagnostics at correct spans.
+- `[PENDING]` **P3.20** `QueryPrinter` + round-trip property test — *Owner:* S3 — *Accept:* 10 000 random ASTs: `Parse(Print(ast)) == ast`.
+- `[PENDING]` **P3.21** Field evaluators: name/glob, ext, size (units+keywords), dates (keywords, ranges, local TZ), attr, depth, len, type map, parent — *Owner:* S3 — *Accept:* table-driven tests per field; date tests use injected clock across DST boundary.
+- `[PENDING]` **P3.22** Regex evaluator (NonBacktracking + timed fallback) — *Owner:* S3 — *Accept:* ReDoS pattern `(a+)+$` on 1M names completes ≤ 150 ms (NonBacktracking); backreference pattern uses fallback and reports "slow regex mode" warning.
+- `[PENDING]` **P3.23** `path:` directory-set evaluation [§7.2] — *Owner:* S3 — *Accept:* results equal brute-force full-path check on 1M synthetic entries; benchmark ≤ 50 ms.
+- `[PENDING]` **P3.24** Planner (cost ordering, memory/FTS/content-regex/semantic split) + incremental refinement — *Owner:* S3 — *Accept:* planner unit tests assert plan shape; refinement benchmark p50 ≤ 1 ms, p95 ≤ 3 ms on 1M entries.
+- `[PENDING]` **P3.25** Parallel scan executor with cancellation — *Owner:* S3 — *Accept:* cold substring 1M p95 ≤ 15 ms; cancellation of a running query returns within 5 ms.
+- `[PENDING]` **P3.26** `LiveQueryHub` (delta evaluation, coalescing) — *Owner:* S3 — *Accept:* test: 10k file creations matching a live query produce result deltas whose union equals a fresh query; UI-side coalescing ≤ 10 batches/s.
+- `[PENDING]` **P3.27** Tags (`app.db` `tags`, `file_tags`, `file_key` identity, path repair) + `tag:` operator — *Owner:* S3 — *Accept:* tag survives rename and move within volume (FRN-keyed); `path:` keyed tags repaired on rename via watcher.
+- `[PENDING]` **P3.28** Saved filter chains, search categories, column layouts persistence + `category:` macro — *Owner:* S3 — *Accept:* CRUD tests; recursive category reference detected and rejected.
+- `[PENDING]` **P3.29** `dupe:` post-filter (name/size/sha256) — *Owner:* S3 — *Accept:* fixture tree with known duplicates; sha256 computed only for size-collision groups (verified via counter).
+
+### 3E Content index
+- `[PENDING]` **P3.30** Content scheduler + `work_queue` (priority, retry with backoff, pause on battery/CPU) — *Owner:* S3 — *Accept:* tests: failed item retried with exponential backoff up to 5 attempts; pause/resume honored.
+- `[PENDING]` **P3.31** Extractors: plain text (encoding detection), PdfPig, OpenXml, MimeKit (.eml), MsgReader (.msg), IFilter (STA) — *Owner:* S3 — *Accept:* one fixture per format in `tests/TestAssets/content/` → expected text snippet present; IFilter test for `.rtf`.
+- `[PENDING]` **P3.32** FTS5 `content:` evaluation and merge with memory predicates — *Owner:* S3 — *Accept:* `content:"invoice total" ext:pdf` returns only fixture PDFs containing the phrase; p95 ≤ 50 ms on synthetic 100k docs.
+- `[PENDING]` **P3.33** `content:/regex/` streaming scan on candidates (capped, cancellable) — *Owner:* S3 — *Accept:* returns matches progressively; cap reached → warning; cancel within 50 ms.
+- `[PENDING]` **P3.34** `ShellExecuteEx` launch service (STA, `SEE_MASK_INVOKEIDLIST|NOASYNC`) used for double-click — *Owner:* S3 (with S4) — *Accept:* integration test launches a `.txt` with a test-registered verb that writes a marker file; marker appears.
+- `[PENDING]` **P3.35** Benchmarks project covering all §17 index/search budgets — *Owner:* S3 — *Accept:* `dotnet run -c Release --project tests/NexPane.Benchmarks -- --filter *Search*` emits results; README in project lists budget per benchmark.
+- `[PENDING]` **P3.36** QA verification of Phase 3 — *Owner:* S7 — *Accept:* all P3 tests green (incl. Elevated suite run as admin), benchmarks within 120 % of budgets; results recorded in STATE.md.
+
+---
+
+## Phase 4 — Dual-Pane UI, Tabs, Preview & Native Shell
+
+### 4A App shell
+- `[PENDING]` **P4.01** Generic host in WPF `App`, DI composition, Serilog, single-instance mutex + activation pipe (`"%V"` → new tab) — *Owner:* S4 — *Accept:* launching `NexPane.exe C:\Windows` twice yields one process with two tabs (FlaUI).
+- `[PENDING]` **P4.02** `app.manifest`: PerMonitorV2, longPathAware, Common Controls v6, Win10 supportedOS — *Owner:* S4 — *Accept:* `mt.exe -inputresource:NexPane.exe;#1 -out:x.manifest` contains all four; moving window between 100 %/150 % monitors re-renders crisp *(manual)*.
+- `[PENDING]` **P4.03** `DispatcherStallWatchdog` and `DispatcherCoalescer<T>` [§5] — *Owner:* S4 — *Accept:* unit test with a deliberately blocked dispatcher logs one stall > 100 ms; coalescer delivers ≤ 10 batches/s under 100k items/s load.
+- `[PENDING]` **P4.04** Theme engine: tokens, Dark/Light/Custom JSON, follow-system, DWM dark title bar, AvalonDock + AvalonEdit theme sync — *Owner:* S4 — *Accept:* FlaUI test switches theme at runtime without restart; snapshot of 5 key brushes matches expected per theme; custom JSON with invalid color rejected with message.
+
+### 4B Panes, tabs, list
+- `[PENDING]` **P4.05** `FilePaneView` + `FileListView` (virtualized GridView, details/list/tiles/thumbnails modes, sortable columns, column chooser) — *Owner:* S4 — *Accept:* folder with 100k files: first paint ≤ 150 ms, scroll stays ≥ 50 fps *(UITests timing probe)*.
+- `[PENDING]` **P4.06** `VirtualResultList` (generation swap, small-delta Add/Remove, selection preservation) — *Owner:* S4 — *Accept:* unit tests: selection and scroll anchor preserved across 1 000 random deltas.
+- `[PENDING]` **P4.07** Dual pane: horizontal/vertical orientation, single-pane mode, swap panes, linked vs independent navigation — *Owner:* S4 — *Accept:* FlaUI: in linked mode navigating left `C:\Windows\System32` moves right to matching relative path when it exists, otherwise shows a non-modal notice.
+- `[PENDING]` **P4.08** Tabs: unlimited, drag-reorder, drag across panes, pin, lock, duplicate, middle-click close, reopen closed (25-deep), overflow menu — *Owner:* S4 — *Accept:* FlaUI: open 200 tabs → UI responsive (< 100 ms per tab open); locked tab navigation opens new tab; pinned tabs survive Close All.
+- `[PENDING]` **P4.09** Breadcrumb address bar with edit mode, autocomplete, `shell:` paths — *Owner:* S4 — *Accept:* typing `shell:Downloads` navigates to the Downloads known folder; autocomplete suggests children within 100 ms.
+- `[PENDING]` **P4.10** Navigation history (back/forward/up), per-tab — *Owner:* S4 — *Accept:* unit tests for history model; FlaUI Alt+Left/Alt+Right/Alt+Up.
+- `[PENDING]` **P4.11** Folder tree panel (lazy, This PC, network locations, quick access pins) — *Owner:* S4 — *Accept:* expanding a 10k-subfolder directory does not freeze UI (watchdog logs no stall).
+- `[PENDING]` **P4.12** Session restore (autosave 30 s + on exit, named sessions) — *Owner:* S4 — *Accept:* FlaUI: configure 2 panes × 3 tabs incl. locked/pinned + dock layout, kill process (`Stop-Process -Force`), relaunch → identical state.
+
+### 4C Search UI
+- `[PENDING]` **P4.13** Search box with search-as-you-type into a search tab, syntax highlighting of operators, inline diagnostics, elapsed time display — *Owner:* S4 — *Accept:* FlaUI types `ext:pdf size:>1MB` char by char; results update after each keystroke; invalid input shows underline and tooltip.
+- `[PENDING]` **P4.14** Visual Advanced Filter builder (AND/OR/NOT groups, field pickers, value editors) bound to AST with live printed query — *Owner:* S4 — *Accept:* building a 3-level nested filter produces text equal to `QueryPrinter` output; editing text updates the builder (round trip).
+- `[PENDING]` **P4.15** Search categories UI (sidebar list, create from current search with column layout + filter chain) — *Owner:* S4 — *Accept:* create category, restart app, category present and produces same results and column layout.
+- `[PENDING]` **P4.16** Indexing status UI (per-volume source, progress, service missing hint) — *Owner:* S4 — *Accept:* with service stopped, status shows "Walker" and the hint; with service running, "NTFS fast index".
+
+### 4D Native shell
+- `[PENDING]` **P4.17** `ShellContextMenuService` (same-parent, cross-parent, background menus; Shift → extended verbs) [§11] — *Owner:* S4 — *Accept:* `[STA]` integration test builds menu for a temp file and asserts presence of verbs `open`, `properties`, `delete`; FlaUI: right-click shows a UIA `Menu` containing "Properties".
+- `[PENDING]` **P4.18** IContextMenu2/3 message forwarding via `HwndSource` hook — *Owner:* S4 — *Accept:* FlaUI: "Send to" submenu populates with ≥ 1 item; "New" submenu on background menu lists "Folder".
+- `[PENDING]` **P4.19** Verb interception (rename/delete/open-folder) routed to in-app handlers — *Owner:* S4 — *Accept:* choosing Rename from native menu starts in-place rename in the list; Delete goes through IFileOperation with undo record.
+- `[PENDING]` **P4.20** `IShellFileOperations` (IFileOperation copy/move/delete/rename/new folder, progress sink, undo) — *Owner:* S4 — *Accept:* `[STA]` tests: copy 100 files → all present; delete → items in Recycle Bin (verified via `Shell.Application` `Namespace(10)`); progress callbacks received.
+- `[PENDING]` **P4.21** Keyboard shortcuts for file ops (F2, Del, Shift+Del, Ctrl+C/X/V via shell clipboard `CFSTR_SHELLIDLIST` + `CF_HDROP` + `Preferred DropEffect`) — *Owner:* S4 — *Accept:* copy in NexPane → paste in Explorer works and vice versa *(UITests with an Explorer window)*.
+- `[PENDING]` **P4.22** Native drag source (`SHDoDragDrop`, drag images) and drop target forwarding to shell `IDropTarget` [§11] — *Owner:* S4 — *Accept:* FlaUI drag from NexPane to Explorer window copies file; drag from Explorer into NexPane pane moves/copies per modifier; drop onto a `.zip` in list adds the file (shell zip folder handler).
+- `[PENDING]` **P4.23** Thumbnails + system icons with LRU cache on Shell STA pool — *Owner:* S4 — *Accept:* 10k-image folder in thumbnail mode: UI thread never stalls > 100 ms; memory for thumbnail cache ≤ 200 MB.
+- `[PENDING]` **P4.24** Explorer "Open in NexPane" handling of `%V` for folders, drives, background (args parsing) — *Owner:* S4 — *Accept:* `NexPane.exe "C:\"`, `NexPane.exe "C:\Program Files"`, `NexPane.exe "\\server\share"` each open the right location (unit test of arg parser + FlaUI for first two).
+
+### 4E Preview
+- `[PENDING]` **P4.25** `PreviewRouter` + provider priorities + per-extension user overrides — *Owner:* S4 — *Accept:* unit tests choose expected provider for 30 extensions.
+- `[PENDING]` **P4.26** Image preview (WIC, `DecodePixelWidth`, EXIF orientation, animated GIF first frame + play toggle) — *Owner:* S4 — *Accept:* 20 MP JPEG renders ≤ 150 ms; rotated EXIF fixture displays upright.
+- `[PENDING]` **P4.27** PDF preview (Docnet: page nav, zoom, text selection off) — *Owner:* S4 — *Accept:* first page ≤ 300 ms on fixture; encrypted PDF prompts for password.
+- `[PENDING]` **P4.28** Audio/video preview (MediaElement, transport controls, unsupported-codec message) — *Owner:* S4 — *Accept:* mp3 and mp4 fixtures play (position advances); unsupported fixture shows message, no exception.
+- `[PENDING]` **P4.29** Code preview (AvalonEdit, highlighting by extension, ≤ 5 MB, read-only) — *Owner:* S4 — *Accept:* `.cs`, `.py`, `.json`, `.xml`, `.ps1` fixtures highlighted (definition resolved non-null).
+- `[PENDING]` **P4.30** Markdown preview (Markdig → WebView2, scripts disabled, CSP, plain-text fallback) — *Owner:* S4 — *Accept:* fixture with `<script>` tag does not execute (test checks `document.title` unchanged via `ExecuteScriptAsync` from host with scripts re-enabled only in test harness); missing runtime → text fallback.
+- `[PENDING]` **P4.31** Text/hex preview with encoding detection — *Owner:* S4 — *Accept:* UTF-16LE, UTF-8 BOM, Windows-1252 fixtures render correctly; binary file shows hex.
+- `[PENDING]` **P4.32** `PreviewHandlerHost : HwndHost` — LOCAL_SERVER first, in-proc fallback, init with stream/file/item, resize, theme visuals, unload on selection change [§11] — *Owner:* S4 — *Accept:* with Office installed, `.docx` renders via native handler *(manual if Office absent, recorded)*; `.txt`/.`xml` via Windows built-in handlers render in UITests; switching selection 100× leaves no leaked `prevhost.exe` instances beyond 1.
+- `[PENDING]` **P4.33** Crash sentinel, timeout (5 s) and blocklist management UI — *Owner:* S4 — *Accept:* test registers a fake preview handler COM server (test assembly) that hangs → blocklisted with reason `timeout`; sentinel present at startup → CLSID blocklisted.
+- `[PENDING]` **P4.34** Native context menu on preview pane item — *Owner:* S4 — *Accept:* FlaUI right-click in preview pane shows shell menu for the previewed file.
+
+### 4F Customization
+- `[PENDING]` **P4.35** `ICommandRegistry` + Command Palette — *Owner:* S4 — *Accept:* every menu/toolbar action has a command id; palette fuzzy search finds "Swap panes".
+- `[PENDING]` **P4.36** Configurable keyboard shortcuts incl. chords, conflict detection, reset to defaults — *Owner:* S4 — *Accept:* rebinding persists in settings.json and works after restart; conflicting binding prompts.
+- `[PENDING]` **P4.37** Toolbar + Quick Access Toolbar with drag-drop customization dialog — *Owner:* S4 — *Accept:* FlaUI drags a command into QAT; persists after restart.
+- `[PENDING]` **P4.38** Dockable panels (AvalonDock) with layout save/restore and reset — *Owner:* S4 — *Accept:* floating the Preview panel and restarting restores floating position.
+- `[PENDING]` **P4.39** QA verification of Phase 4 — *Owner:* S7 — *Accept:* full FlaUI suite green on Win11; manual checks (DPI, Office preview) recorded; Win10 22H2 VM smoke run recorded.
+
+---
+
+## Phase 5 — Power Tools (Archives, Sync/Compare, Metadata, Scripting, Network)
+
+### 5A Archives
+- `[PENDING]` **P5.01** Ship `7z.dll` x64 (from official 7-Zip release, SHA-256 recorded in `eng/third-party.lock.json`) + `SevenZipArchiveProvider` list/extract/test — *Owner:* S5 — *Accept:* fixtures zip, 7z, tar, tar.gz, tar.bz2, tar.xz, gz, rar4, rar5, iso, cab all list and extract with file hashes equal to expected manifest.
+- `[PENDING]` **P5.02** Create/update/delete-entries for zip, 7z, tar, gz, bz2, xz; compression levels — *Owner:* S5 — *Accept:* create → test → list round-trip; add then remove entry leaves archive passing `Test`.
+- `[PENDING]` **P5.03** Encryption: 7z AES-256 (+ header encryption), zip AES-256, ZipCrypto legacy opt-in; password prompts with retry — *Owner:* S5 — *Accept:* encrypted archives created by NexPane open in 7-Zip CLI (`7z t -p...` in test if 7z.exe present, else via our own reader); wrong password → retry prompt, 3 failures → error.
+- `[PENDING]` **P5.04** RAR read-only enforcement + UI messaging — *Owner:* S5 — *Accept:* "Add to archive" format list contains no RAR; RAR archive context shows Extract/Test only.
+- `[PENDING]` **P5.05** `SharpCompressArchiveProvider` fallback — *Owner:* S5 — *Accept:* with `7z.dll` renamed in test, zip/tar.gz/7z (read) fixtures still list/extract.
+- `[PENDING]` **P5.06** `ArchiveFileSystemProvider` (`archive:` virtual folders, nested archives, temp extraction, modified-temp write-back prompt) — *Owner:* S5 — *Accept:* navigate into zip inside 7z inside folder; preview inner image; edit extracted temp file → prompt → archive updated (hash check).
+- `[PENDING]` **P5.07** Safety: zip-slip, absolute paths, symlink entries, bomb guard — *Owner:* S5 — *Accept:* malicious fixtures (`../../evil.txt`, `C:\evil.txt`, 1 KB → 20 GB bomb) are rejected/prompted; nothing written outside destination.
+- `[PENDING]` **P5.08** Virtual-file drag out of archives (`CFSTR_FILEDESCRIPTORW`/`FILECONTENTS`) — *Owner:* S5 (with S4) — *Accept:* FlaUI drag of an archive item into an Explorer window produces the file with correct content.
+
+### 5B Compare / sync
+- `[PENDING]` **P5.09** `FolderComparer` (timestamp tolerance, size, SHA-256; case sensitivity rules) — *Owner:* S5 — *Accept:* generated trees with known diffs produce exact expected categories (left-only, right-only, newer-left, newer-right, same, conflict).
+- `[PENDING]` **P5.10** `SyncPlanner` one-way mirror/update, two-way with baseline — *Owner:* S5 — *Accept:* scenario tests (create/modify/delete on each side between runs) produce expected actions; plan is idempotent (second plan after execution is empty).
+- `[PENDING]` **P5.11** Conflict policies + resolver UI — *Owner:* S5 — *Accept:* each policy produces expected outcome; "keep both" suffix format exact.
+- `[PENDING]` **P5.12** `SyncExecutor` with progress, cancellation, Recycle Bin deletes, partial-failure report — *Owner:* S5 — *Accept:* cancellation mid-run leaves no half-written files (temp + rename); locked file reported as failure, others succeed.
+- `[PENDING]` **P5.13** Compare/sync UI (side-by-side grid, filters, dry-run plan view, saved pairs) — *Owner:* S5 — *Accept:* FlaUI: create pair, preview plan, execute, re-run shows "in sync".
+- `[PENDING]` **P5.14** Remote sync (local ↔ SFTP/FTP/WebDAV via VFS) — *Owner:* S5 — *Accept:* env-gated live test against SFTP server: two-way sync scenario passes.
+
+### 5C Batch rename & metadata
+- `[PENDING]` **P5.15** Rename pattern parser + token evaluators (counter, dates, EXIF, ID3, parent, case, regex) — *Owner:* S5 — *Accept:* table tests for every token; EXIF token on fixture JPEG yields `DateTimeOriginal`.
+- `[PENDING]` **P5.16** Preview with conflict detection (duplicates, invalid chars, reserved names, length) — *Owner:* S5 — *Accept:* tests produce correct conflict flags; Apply disabled while conflicts exist.
+- `[PENDING]` **P5.17** Two-phase apply with journal + undo — *Owner:* S5 — *Accept:* swap test (`a→b`, `b→a`) succeeds; undo restores original names; crash simulation mid-batch → undo still restores completed steps.
+- `[PENDING]` **P5.18** Batch renamer UI (live preview grid, presets) — *Owner:* S5 — *Accept:* FlaUI rename 50 files with `[C:1:1:3]_[N]`, then Undo.
+- `[PENDING]` **P5.19** Metadata providers: EXIF read (MetadataExtractor), Property System read/write, ID3/media read/write (TagLibSharp), PDF read (PdfPig)/write (PDFsharp), ADS list/read/write/delete + Unblock — *Owner:* S5 — *Accept:* per-provider round-trip tests on fixtures (write → re-read equals); ADS test creates `:nexpane.test` stream and removes `Zone.Identifier`.
+- `[PENDING]` **P5.20** Metadata inspector/editor panel (grouped, editable where writable, read-only reasons) — *Owner:* S5 — *Accept:* FlaUI edit ID3 Title on fixture mp3 → TagLibSharp re-read matches.
+
+### 5D Scripting
+- `[PENDING]` **P5.21** `JintScriptHost` with limits (timeout, memory, statements, recursion), no CLR — *Owner:* S5 — *Accept:* tests: infinite loop terminated ≤ timeout; `importNamespace`/CLR access throws; memory bomb stopped.
+- `[PENDING]` **P5.22** `NexPane.*` API facades with permission checks [§12.5] — *Owner:* S5 — *Accept:* each API has a test proving it works with permission and throws `PermissionDenied` without.
+- `[PENDING]` **P5.23** Permission manifest parsing + hash-pinned approval dialog — *Owner:* S5 — *Accept:* modifying script content re-prompts; unapproved script does not run.
+- `[PENDING]` **P5.24** Events (`fileCreated`, `fileRenamed`, `folderOpened`, `selectionChanged`) with query filter + rate limiting — *Owner:* S5 — *Accept:* routing script moves `*.pdf` created in a watched folder to `Docs\` within 2 s; 10k events/s burst coalesced without UI stall.
+- `[PENDING]` **P5.25** Custom toolbar buttons from scripts — *Owner:* S5 (with S4) — *Accept:* script adds a button; clicking runs handler; disabling script removes button.
+- `[PENDING]` **P5.26** Script console panel (REPL, history, output, errors with line numbers) + script editor (AvalonEdit JS highlighting) — *Owner:* S5 — *Accept:* FlaUI evaluates `NexPane.ui.currentFolder()` and sees path output.
+
+### 5E Network VFS
+- `[PENDING]` **P5.27** SMB via UNC + `WNetAddConnection2W` with stored credentials — *Owner:* S5 — *Accept:* `[Elevated]` test share with dedicated local user credentials connects and lists.
+- `[PENDING]` **P5.28** FTP/FTPS provider (FluentFTP; explicit/implicit TLS; passive; MLSD/LIST fallback; cert TOFU pin) — *Owner:* S5 — *Accept:* env-gated live tests list/upload/download/rename/delete; unit tests for pin store; untrusted cert prompts.
+- `[PENDING]` **P5.29** SFTP provider (SSH.NET; password/key/keyboard-interactive; host key TOFU, mismatch hard-fail) — *Owner:* S5 — *Accept:* env-gated live tests; unit test: changed host key → connection refused with warning.
+- `[PENDING]` **P5.30** WebDAV provider (WebDav.Client; PROPFIND/GET/PUT/MOVE/DELETE/MKCOL; Basic over HTTPS only) — *Owner:* S5 — *Accept:* WireMock protocol-shape tests + env-gated live test; Basic over HTTP refused.
+- `[PENDING]` **P5.31** Connection manager UI + CredMan storage (`NexPane:net:<id>`) — *Owner:* S5 — *Accept:* create connection, restart, connect without re-entering password; secret not present in `app.db` (grep test).
+- `[PENDING]` **P5.32** Cross-provider `ITransferService` (local↔remote, remote↔remote via local stream) with progress, resume for FTP/SFTP — *Owner:* S5 — *Accept:* 1 GB transfer interrupted at 50 % resumes (env-gated); progress monotonic.
+- `[PENDING]` **P5.33** Background crawler adapters for FTP/SFTP/WebDAV connections into index — *Owner:* S5 (with S3) — *Accept:* crawl-enabled connection's files searchable by name; crawl respects interval and concurrency.
+- `[PENDING]` **P5.34** QA verification of Phase 5 — *Owner:* S7 — *Accept:* all P5 tests green incl. env-gated network suite against provisioned servers; security tests (zip-slip, host key) re-run by QA.
+
+---
+
+## Phase 6 — Multi-Provider AI
+
+### 6A Infrastructure
+- `[PENDING]` **P6.01** `ICredentialStore` (CredMan + DPAPI overflow for > 2 560 bytes) and `ISecretProtector` — *Owner:* S6 — *Accept:* round-trip tests for 100-byte and 5 000-byte secrets; overflow file is not plaintext (entropy test); delete removes both.
+- `[PENDING]` **P6.02** `AiProviderRegistry`, `ai_providers`, `ai_feature_bindings`, presets file `ai-presets.json` — *Owner:* S6 — *Accept:* CRUD tests; binding resolution falls back with clear error when provider disabled.
+- `[PENDING]` **P6.03** Resilient HttpClient pipelines + log redaction — *Owner:* S6 — *Accept:* WireMock 429 with `retry-after: 1` retried once after ≥ 1 s; log output contains no API key (grep in test).
+- `[PENDING]` **P6.04** Egress consent gate + status-bar indicator + `ai_usage` logging (metadata only) — *Owner:* S6 — *Accept:* first cloud call shows consent; declining prevents any HTTP request (WireMock receives 0 calls); `ai_usage` has no content columns populated.
+- `[PENDING]` **P6.05** Provider settings UI (add/edit/test connection/model discovery dropdowns) — *Owner:* S6 — *Accept:* FlaUI: add OpenAI-compatible provider against WireMock `/v1/models` → models listed; "Test" shows success.
+
+### 6B Providers
+- `[PENDING]` **P6.06** OpenAI provider (OpenAI SDK): chat stream, vision, embeddings, transcription, models — *Owner:* S6 — *Accept:* WireMock fixtures for each endpoint; env-gated live smoke.
+- `[PENDING]` **P6.07** Azure AI Foundry provider (OpenAI v1 endpoint and Foundry models inference endpoint; deployment names) — *Owner:* S6 — *Accept:* WireMock fixtures assert `api-key` header and URL shapes for both endpoint styles; env-gated live smoke.
+- `[PENDING]` **P6.08** Anthropic provider (official `Anthropic` SDK): streaming chat, vision, models list, refusal mapping — *Owner:* S6 — *Accept:* WireMock fixtures assert `x-api-key` and `anthropic-version` headers; `stop_reason: "refusal"` maps to `AiFinishReason.Refusal`; embeddings capability flag false.
+- `[PENDING]` **P6.09** Gemini provider (HttpClient REST, SSE, `x-goog-api-key` header, embeddings, models) — *Owner:* S6 — *Accept:* WireMock asserts key in header and not in query string; SSE parser handles split chunks.
+- `[PENDING]` **P6.10** AWS Bedrock provider (ConverseStream, InvokeModel embeddings, ListFoundationModels/ListInferenceProfiles; access key/secret/session token/region/model id) — *Owner:* S6 — *Accept:* unit tests with mocked `IAmazonBedrockRuntime`; SigV4 credentials constructed from CredMan values; env-gated live smoke.
+- `[PENDING]` **P6.11** OpenAI-compatible local provider with LM Studio/Ollama/custom presets + `/v1/models` discovery — *Owner:* S6 — *Accept:* WireMock on `localhost:1234` and `:11434` paths; real Ollama smoke if `NEXPANE_IT_OLLAMA=1`.
+
+### 6C Features
+- `[PENDING]` **P6.12** Chunker + embedding job pipeline + `VectorIndex` (brute-force, TensorPrimitives, int8 above 250k) [§9.3] — *Owner:* S6 — *Accept:* exactness test vs naive cosine on 10k random vectors; benchmark top-10 over 100k × 768 ≤ 30 ms; quantized recall@10 ≥ 0.95.
+- `[PENDING]` **P6.13** `semantic:` operator + hybrid RRF with FTS — *Owner:* S6 (with S3) — *Accept:* fixture corpus with labelled relevant docs: semantic query returns ≥ 3 of 5 labelled docs in top-10 using WireMock deterministic embeddings.
+- `[PENDING]` **P6.14** Embedding model switch (new `model_key`, re-embed, delete old) — *Owner:* S6 — *Accept:* switching models leaves only new vectors after completion; searches during migration use old space.
+- `[PENDING]` **P6.15** NL → query assistant (grammar prompt, JSON output, validate via parser, one repair round, user confirm) — *Owner:* S6 — *Accept:* with WireMock returning invalid then valid JSON, final query parses; result shown for confirmation, not executed automatically.
+- `[PENDING]` **P6.16** Summarize / Translate (map-reduce for long docs, streaming panel) — *Owner:* S6 — *Accept:* WireMock-driven tests: long doc triggers N map calls + 1 reduce; cancellation stops further requests.
+- `[PENDING]` **P6.17** Prepare-a-Reply for `.eml`/`.msg` (draft panel, Copy, Save as .eml; never sends) — *Owner:* S6 — *Accept:* fixture emails produce saved `.eml` parsable by MimeKit with `In-Reply-To` header set; no SMTP code path exists (architecture test: AI project has no reference to `System.Net.Mail`/MailKit SMTP).
+- `[PENDING]` **P6.18** Audio decode + resample (NAudio MF → 16 kHz mono PCM16) — *Owner:* S6 — *Accept:* mp3/m4a/wav/mp4 fixtures decode; output sample rate and channel count asserted.
+- `[PENDING]` **P6.19** Local Whisper.net transcription + model download manager (pinned SHA-256, consent, resume) — *Owner:* S6 — *Accept:* `NEXPANE_IT_WHISPER=1`: tiny model transcribes fixture "the quick brown fox" wav with WER ≤ 20 %; corrupted download rejected by hash.
+- `[PENDING]` **P6.20** Cloud STT (OpenAI/Azure) with chunking on silence > 25 MB and timestamp offsets — *Owner:* S6 — *Accept:* WireMock: 3 chunks returned → merged segments monotonic with correct offsets.
+- `[PENDING]` **P6.21** `.srt` / `.txt` export + `transcript_segments` + searchable `doc_text(kind=3)` — *Owner:* S6 — *Accept:* SRT output validates against format regex; transcript words found via `content:`.
+- `[PENDING]` **P6.22** OCR service (Windows.Media.Ocr: images + scanned PDF via Docnet render) → `ocr_lines` + `doc_text(kind=2)` — *Owner:* S6 — *Accept:* fixture image with known text recognized (≥ 90 % character accuracy, en-US); scanned PDF fixture text searchable; test skipped with explicit reason when en-US OCR not installed.
+- `[PENDING]` **P6.23** Visual descriptions (vision model, downscale, batch with estimate + explicit start) → `doc_text(kind=4)` — *Owner:* S6 — *Accept:* WireMock vision response stored and searchable; batch shows request count before start.
+- `[PENDING]` **P6.24** AI assistant panel (chat about selected files, streaming, stop button, copy) — *Owner:* S6 — *Accept:* FlaUI: stop button cancels within 200 ms (WireMock slow stream).
+- `[PENDING]` **P6.25** QA verification of Phase 6 — *Owner:* S7 — *Accept:* all P6 tests green; env-gated live smoke for each configured provider recorded; secret-leak grep over logs/DBs/settings returns nothing.
+
+---
+
+## Phase 7 — QA Audit & Installer
+
+- `[PENDING]` **P7.01** Placeholder audit (`eng/check-placeholders.ps1`) + manual code review of all `src/` — *Owner:* S7 — *Accept:* script exit 0; review notes in STATE.md.
+- `[PENDING]` **P7.02** Full test run (unit + integration + Elevated as admin + env-gated live) — *Owner:* S7 — *Accept:* `dotnet test NexPane.sln -c Release` green; elevated suite green; results archived in `build/test-results/` and summarized in STATE.md.
+- `[PENDING]` **P7.03** Performance audit vs §17 — *Owner:* S7 — *Accept:* BenchmarkDotNet reports all metrics within 120 % of budget; deviations filed as `[BLOCKED]` items with owner.
+- `[PENDING]` **P7.04** Security audit (secrets grep, log redaction, script sandbox escape attempts, zip-slip, pipe ACL, AccessCheck, WebView2 script off, DLL search order) — *Owner:* S7 — *Accept:* checklist in STATE.md, every item pass.
+- `[PENDING]` **P7.05** Accessibility audit (keyboard-only operation, UIA names on all controls, high contrast theme respected) — *Owner:* S7 — *Accept:* Accessibility Insights FastPass on main window: 0 failures *(manual, recorded)*; FlaUI keyboard-only scenario passes.
+- `[PENDING]` **P7.06** `THIRD-PARTY-NOTICES.txt` complete with license texts; LGPL source links — *Owner:* S7 — *Accept:* every shipped DLL in publish folder maps to a notice entry (script `eng/check-notices.ps1`).
+- `[PENDING]` **P7.07** Self-contained publish (App + IndexService, R2R, x64) — *Owner:* S7 — *Accept:* `eng/publish.ps1` produces `build\publish\win-x64\NexPane.exe`; runs on clean Windows Sandbox without .NET installed.
+- `[PENDING]` **P7.08** `installer/NexPane.iss` (AppId `{23676795-F60E-4EAF-95C6-C4D81BAD01C1}`, license page, directory, shortcuts, tasks, registry verbs, index service, WebView2 bootstrap, uninstall data prompt) [§19.3] — *Owner:* S7 — *Accept:* `ISCC.exe installer\NexPane.iss` → `dist\NexPane-Setup-<ver>.exe` with exit 0 and no warnings.
+- `[PENDING]` **P7.09** Installer verification in Windows Sandbox: silent and interactive install, shortcuts, "Open in NexPane" on folder/drive/background, service running, upgrade over previous build, uninstall clean — *Owner:* S7 — *Accept:* `eng/test-installer.ps1` passes all checks; interactive wizard screenshots attached to STATE.md *(manual)*.
+- `[PENDING]` **P7.10** Win10 1809 (or oldest available) + Win10 22H2 + Win11 24H2/25H2 smoke matrix — *Owner:* S7 — *Accept:* launch, browse, search, preview, context menu, install/uninstall pass on each *(manual, recorded)*.
+- `[PENDING]` **P7.11** Code signing of exe/service/installer (if certificate provided — Q2) — *Owner:* S7 — *Accept:* `Get-AuthenticodeSignature` Status `Valid` on all three; otherwise item `[BLOCKED]` on Q2.
+- `[PENDING]` **P7.12** Release notes + known limitations (from ARCHITECTURE §20) in `docs/RELEASE-NOTES.md` — *Owner:* S7 — *Accept:* every R-item listed with user-facing wording.
+- `[PENDING]` **P7.13** Final doc sync: ARCHITECTURE decision log, STATE, HANDOFF reflect shipped reality — *Owner:* S1 (reviewed by S7) — *Accept:* QA diff review finds no contradiction between docs and code.

@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>NexPane.Network</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NexPane.Core\NexPane.Core.csproj" />
+    <ProjectReference Include="..\NexPane.Shell\NexPane.Shell.csproj" />
+  </ItemGroup>
+
+</Project>

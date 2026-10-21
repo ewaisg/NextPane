@@ -1,0 +1,28 @@
+<Project>
+  <!-- Shared build settings for every NexPane project. See docs/handoff/ARCHITECTURE.md §2. -->
+  <PropertyGroup>
+    <!-- Default TFM for all projects. NexPane.Core overrides this with plain net10.0 (no Windows APIs). -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <PlatformTarget>x64</PlatformTarget>
+
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <InvariantGlobalization>false</InvariantGlobalization>
+
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- NuGet vulnerability audit stays visible as warnings but must not break local builds; QA (P7.04) treats them as release blockers. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <Company>NexPane</Company>
+    <Product>NexPane</Product>
+    <Copyright>Copyright © 2026 NexPane</Copyright>
+    <Version>0.1.0</Version>
+    <NeutralLanguage>en-US</NeutralLanguage>
+  </PropertyGroup>
+</Project>

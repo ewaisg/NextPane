@@ -1,0 +1,33 @@
+# Normalize text to CRLF in the working tree (Windows-only project), LF in the repo.
+* text=auto eol=crlf
+
+*.sh text eol=lf
+
+# Binary assets and fixtures
+*.ico binary
+*.png binary
+*.bmp binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.heic binary
+*.pdf binary
+*.dll binary
+*.exe binary
+*.zip binary
+*.7z binary
+*.rar binary
+*.gz binary
+*.tar binary
+*.mp3 binary
+*.mp4 binary
+*.m4a binary
+*.wav binary
+*.flac binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.msg binary
+*.db binary
+*.bin binary
