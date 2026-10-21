@@ -97,7 +97,7 @@ C:\Users\Ewais\Projects\NexPane\
 │  ├─ common.ps1                    # shared helpers (fail-fast native calls, -DryRun, optional signing)
 │  ├─ build.ps1                     # restore + build + test
 │  ├─ publish.ps1                   # self-contained publish to build\publish\win-x64
-│  └─ installer.ps1                 # runs ISCC.exe → dist\NexPane-Setup-<ver>.exe
+│  └─ installer.ps1                 # runs ISCC.exe → dist\NexPane-Setup.exe
 ├─ assets/
 │  ├─ brand/  nexpane-logo.svg  nexpane-mark.svg
 │  ├─ icons/  NexPane.ico  NexPane-16.png … NexPane-256.png  tray.ico  folder-open.ico
@@ -136,7 +136,7 @@ C:\Users\Ewais\Projects\NexPane\
 │  ├─ NexPane.iss                   # Inno Setup 6 script
 │  └─ (LicenseFile points at ..\LICENSE.txt — proprietary EULA, decision D1)
 ├─ build/                           # (ignored) intermediate + publish output
-└─ dist/                            # (ignored) NexPane-Setup-<ver>.exe
+└─ dist/                            # (ignored) NexPane-Setup.exe
 ```
 
 ### Project table
@@ -1445,7 +1445,7 @@ Reference machine: 8-core/16-thread desktop CPU (Ryzen 7 5800X / Core i7-12700 c
 - `dotnet publish src/NexPane.App/NexPane.App.csproj -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=true -o build/publish/win-x64` (+ same for `NexPane.IndexService` into the same folder). **Not** single-file (native libs: e_sqlite3, 7z.dll, whisper, PDFium, WebView2Loader) and **not** trimmed (WPF is not trim-safe).
 
 ### 19.3 Installer (`installer/NexPane.iss`, Inno Setup 6)
-- `AppId={{23676795-F60E-4EAF-95C6-C4D81BAD01C1}` (fixed forever; changing it breaks upgrades), `ArchitecturesAllowed=x64compatible`, `ArchitecturesInstallIn64BitMode=x64compatible`, `MinVersion=10.0.17763`, `PrivilegesRequired=admin`, `PrivilegesRequiredOverridesAllowed=dialog` (per-user install possible, then the Index Service task is disabled), `LicenseFile=..\LICENSE.txt` (proprietary EULA, decision D1; `THIRD-PARTY-NOTICES.txt` installed to `{app}`), no `SignTool` directive (decision D2: unsigned), `SetupIconFile=..\assets\icons\NexPane.ico`, `UninstallDisplayIcon={app}\NexPane.exe`, `WizardStyle=modern`, `OutputDir=..\dist`, `OutputBaseFilename=NexPane-Setup-{#AppVersion}`, `SolidCompression=yes`, `Compression=lzma2/ultra64`.
+- `AppId={{23676795-F60E-4EAF-95C6-C4D81BAD01C1}` (fixed forever; changing it breaks upgrades), `ArchitecturesAllowed=x64compatible`, `ArchitecturesInstallIn64BitMode=x64compatible`, `MinVersion=10.0.17763`, `PrivilegesRequired=admin`, `PrivilegesRequiredOverridesAllowed=dialog` (per-user install possible, then the Index Service task is disabled), `LicenseFile=..\LICENSE.txt` (proprietary EULA, decision D1; `THIRD-PARTY-NOTICES.txt` installed to `{app}`), no `SignTool` directive (decision D2: unsigned), `SetupIconFile=..\assets\icons\NexPane.ico`, `UninstallDisplayIcon={app}\NexPane.exe`, `WizardStyle=modern`, `OutputDir=..\dist`, `OutputBaseFilename=NexPane-Setup`, `SolidCompression=yes`, `Compression=lzma2/ultra64`.
 - Pages: Welcome → License → Directory → Start Menu folder → Tasks → Ready → Install → Finish (launch option).
 - Tasks: `desktopicon`, `contextmenu` ("Add 'Open in NexPane' to Explorer context menu", checked; classic menu only — Windows 11 shows it under "Show more options", decision D2), `indexservice` ("Install NexPane Index Service for fast NTFS indexing", **checked by default** in admin installs per decision D3, hidden in per-user installs). The task description carries the privacy note: *"Runs as a background Windows service with administrator rights to read the NTFS change journal. File names are only shown to Windows users who are allowed to list the containing folder. Nothing leaves this computer."*
 - Uninstall "remove user data" also deletes `%LOCALAPPDATA%\NexPane\runtimes\` (GPU Whisper packs) and downloaded models.

@@ -80,7 +80,7 @@ WizardImageFile={#WizardImages}
 WizardSmallImageFile={#WizardSmallImages}
 #endif
 OutputDir={#RepoRoot}\dist
-OutputBaseFilename=NexPane-Setup-{#AppVersion}
+OutputBaseFilename=NexPane-Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 CloseApplications=yes

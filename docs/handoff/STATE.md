@@ -9,7 +9,7 @@
 |---|---|
 | Current phase | **Phase 1 — Architecture / Stack Lock / Handoff Init** (all deliverables done except P1.12) |
 | Toolchain | .NET SDK 10.0.402, Git 2.55.0, Inno Setup **6.7.3** (per-user: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) |
-| Pipeline (P1.11) | `eng\build.ps1` → `eng\publish.ps1` → `eng\installer.ps1 -AllowMissingBranding` verified: `dist\NexPane-Setup-0.1.0.exe` = **55,354,308 bytes (52.8 MB)**; publish folder 462 files / 196.2 MB |
+| Pipeline (P1.11) | `eng\build.ps1` → `eng\publish.ps1` → `eng\installer.ps1 -AllowMissingBranding` verified: `dist\NexPane-Setup.exe` = **55,354,308 bytes (52.8 MB)**; publish folder 462 files / 196.2 MB |
 | Git | Repo on `main`, no remote. Commits: `c6b4d4f` (scaffold) and a follow-up docs/decisions commit (see `git log`). Local identity: `NexPane Dev <ewaisg@gmail.com>`. |
 | Solution | `NexPane.sln`: 15 `src` projects, 16 test projects, 1 benchmark runner |
 | Build | `dotnet build NexPane.sln -c Release` → **Build succeeded. 0 Warning(s) 0 Error(s)** |
@@ -57,7 +57,7 @@ Package pins (`Directory.Packages.props`): Microsoft.Extensions.Hosting.WindowsS
   - `-DryRun` on all three scripts prints the HANDOFF §5 commands.
   - `build.ps1`: restore; build `0 Warning(s) 0 Error(s)`; tests `total: 47, failed: 0, succeeded: 47`.
   - `publish.ps1`: App + IndexService published self-contained R2R into `build\publish\win-x64` (462 files, 196.2 MB); "signing skipped". The published `NexPane.exe` opens the "NexPane" window and exits 0.
-  - `installer.ps1 -AllowMissingBranding`: Inno Setup 6.7.3 compiled with no warnings in about 34 s, producing `dist\NexPane-Setup-0.1.0.exe` (55,354,308 bytes).
+  - `installer.ps1 -AllowMissingBranding`: Inno Setup 6.7.3 compiled with no warnings in about 34 s, producing `dist\NexPane-Setup.exe` (55,354,308 bytes).
   - Fail-fast: a failing step's exit code propagates (7 → 7). An ISCC error exits 2 and its message is shown. Missing branding exits 1 (script) or hits `#error` (`.iss`).
 - The setup exe was **not** run on this machine.
 
@@ -119,7 +119,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
   - Fixed two Inno 6.7.3 compile issues: custom messages need the `english.` prefix, and `RemoveBackslash` is deprecated.
   - Added two ARCHITECTURE §21 decision-log rows: the service is managed in `[Code]`, and the `-AllowMissingBranding` / `-DryRun` / warnings-as-errors script behaviour.
 - Deviations:
-  - The output is named `dist\NexPane-Setup-<version>.exe`, per ARCHITECTURE §19.3, instead of an unversioned `NexPane-Setup.exe`.
+  - Orchestrator correction: the output is the unversioned `dist\NexPane-Setup.exe` as the product spec mandates (the release engineer had used `NexPane-Setup-<version>.exe`). The version lives in the exe's version resource (ProductVersion 0.1.0). Re-verified: compiles warning-free, 55,354,308 bytes.
   - The WebView2 bootstrap is deferred to P7.08.
 
 ### 2026-10-21 (b) — Subagent 1 (Lead Architect & State Scribe)

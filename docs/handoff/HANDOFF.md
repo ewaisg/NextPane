@@ -21,7 +21,7 @@ The build → test → publish → installer pipeline (P1.11) is scripted in `en
 | `src/*` | Project shells only (no code), except `NexPane.App` (MainWindow) and `NexPane.IndexService` (`Program.BuildHost`) |
 | `tests/NexPane.Architecture.Tests` | Layering + convention tests, `[READY_FOR_QA]` (P1.10) |
 | `tests/Shared/ModuleAssembly.cs` | Shared helper linked into every `*Tests` project (x64 / target framework assertions) |
-| `eng/common.ps1`, `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss` | Complete, `[READY_FOR_QA]` (P1.11); pipeline verified end-to-end → `dist\NexPane-Setup-0.1.0.exe` (52.8 MB). The `.iss` still needs the WebView2 bootstrapper and real branding in P7.08 |
+| `eng/common.ps1`, `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss` | Complete, `[READY_FOR_QA]` (P1.11); pipeline verified end-to-end → `dist\NexPane-Setup.exe` (52.8 MB). The `.iss` still needs the WebView2 bootstrapper and real branding in P7.08 |
 | Next up | `eng/check-placeholders.ps1` (P1.12) |
 
 ## 3. Environment setup
@@ -84,7 +84,7 @@ dotnet publish src/NexPane.IndexService -c Release -r win-x64 --self-contained -
 # Branding assets (Phase 2, after P2.02 creates the tool)
 dotnet run -c Release --project tools/NexPane.AssetGen -- --svg assets/brand/nexpane-logo.svg --mark assets/brand/nexpane-mark.svg --out assets
 
-# Installer → dist\NexPane-Setup-<version>.exe (version = <Version> in Directory.Build.props)
+# Installer → dist\NexPane-Setup.exe (version = <Version> in Directory.Build.props)
 & $Iscc /DAppVersion=0.1.0 /DPublishDir=C:\Users\Ewais\Projects\NexPane\build\publish\win-x64 installer\NexPane.iss
 ```
 
@@ -97,7 +97,7 @@ $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Env
 Set-Location C:\Users\Ewais\Projects\NexPane
 powershell -NoProfile -ExecutionPolicy Bypass -File eng\build.ps1       # restore, build Release, default test suite  [-SkipTests] [-DryRun]
 powershell -NoProfile -ExecutionPolicy Bypass -File eng\publish.ps1     # cleans + publishes App and IndexService into build\publish\win-x64  [-DryRun]
-powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1   # ISCC → dist\NexPane-Setup-<version>.exe  [-DryRun]
+powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1   # ISCC → dist\NexPane-Setup.exe  [-DryRun]
 # Before Phase 2 delivers the branding assets, the installer step fails on purpose. For pipeline verification ONLY:
 powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMissingBranding
 ```
@@ -105,7 +105,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
 - `-AllowMissingBranding` passes `/DNoBranding` to ISCC, which leaves out `SetupIconFile`, `WizardImageFile` and `WizardSmallImageFile`. It exists only to verify the pipeline before Phase 2. **Phase 7 release builds must not use it.** Without the switch, missing `assets\icons\NexPane.ico` or `assets\installer\wizard-*.bmp` / `wizard-small-*.bmp` fail both `installer.ps1` and the `.iss` (`#error`).
 - `installer.ps1` treats any ISCC `Warning:` line as an error, because P7.08 requires a warning-free compile.
 - **Code signing is an optional step that is skipped by default.** `publish.ps1` (both exes) and `installer.ps1` (setup exe) sign only when `NEXPANE_SIGN_CERT_THUMBPRINT` is set; `NEXPANE_SIGN_TIMESTAMP_URL` is optional. Otherwise they print "signing skipped (NEXPANE_SIGN_CERT_THUMBPRINT not set)". v1 ships unsigned.
-- `build/` and `dist/` are git-ignored output folders. **Never run `dist\NexPane-Setup-*.exe` on the dev machine;** installer testing happens in Windows Sandbox (P7.09).
+- `build/` and `dist/` are git-ignored output folders. **Never run `dist\NexPane-Setup.exe` on the dev machine;** installer testing happens in Windows Sandbox (P7.09).
 
 ## 6. Architectural gotchas (read before writing code)
 

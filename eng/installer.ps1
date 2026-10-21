@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Compiles installer\NexPane.iss with Inno Setup 6 into dist\NexPane-Setup-<version>.exe
+    Compiles installer\NexPane.iss with Inno Setup 6 into dist\NexPane-Setup.exe
     (TODO P1.11 / P7.08, ARCHITECTURE section 19.3).
 
 .DESCRIPTION
@@ -60,7 +60,8 @@ $version = Get-NexPaneVersion
 if ([IO.Path]::IsPathRooted($PublishDir)) { $publishFull = $PublishDir } else { $publishFull = Join-Path $RepoRoot $PublishDir }
 $publishFull = [IO.Path]::GetFullPath($publishFull)
 $issPath = Join-Path $RepoRoot 'installer\NexPane.iss'
-$setupPath = Join-Path $RepoRoot ("dist\NexPane-Setup-$version.exe")
+# Product spec mandates the unversioned name; the version lives in the exe's version resource.
+$setupPath = Join-Path $RepoRoot 'dist\NexPane-Setup.exe'
 
 Write-NexPaneStep 'Check installer inputs'
 Write-Host "    Version:     $version"
