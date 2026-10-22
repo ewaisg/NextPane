@@ -35,7 +35,7 @@ public sealed class SearchPerformanceTests : IClassFixture<SearchPerformanceTest
         var times = Measure(5, () => engine.Evaluate(plan, Request(plan.Ast), _data.Index.Current, Ct));
         Report("ReDoS (a+)+$ over 1M names", times, budgetMs: 150);
 
-        times.Min().Should().BeLessThanOrEqualTo(150 * Gate);
+        Within(times.Min(), 150);
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public sealed class SearchPerformanceTests : IClassFixture<SearchPerformanceTest
         using var engine = new SearchEngine(_data.Index);
         var times = Measure(7, () => engine.Evaluate(plan, Request(plan.Ast), snapshot, Ct));
         Report("path: substring (dir-set) over 1M", times, budgetMs: 50);
-        Percentile(times, 0.95).Should().BeLessThanOrEqualTo(50 * Gate);
+        Within(Percentile(times, 0.95), 50);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public sealed class SearchPerformanceTests : IClassFixture<SearchPerformanceTest
 
         times = times.Skip(queries.Length).ToList(); // first round warms the JIT
         Report("Cold literal substring over 1M", times, budgetMs: 15);
-        Percentile(times, 0.95).Should().BeLessThanOrEqualTo(15 * Gate);
+        Within(Percentile(times, 0.95), 15);
     }
 
     [Fact]
@@ -133,8 +133,8 @@ public sealed class SearchPerformanceTests : IClassFixture<SearchPerformanceTest
 
         times.Should().NotBeEmpty();
         Report("Incremental refinement (keystroke) over 1M", times, budgetMs: 3);
-        Percentile(times, 0.50).Should().BeLessThanOrEqualTo(1 * Gate);
-        Percentile(times, 0.95).Should().BeLessThanOrEqualTo(3 * Gate);
+        Within(Percentile(times, 0.50), 1);
+        Within(Percentile(times, 0.95), 3);
     }
 
     [Fact]
@@ -164,7 +164,7 @@ public sealed class SearchPerformanceTests : IClassFixture<SearchPerformanceTest
         }
 
         Report("Cancellation latency", latencies, budgetMs: 5);
-        Percentile(latencies, 0.50).Should().BeLessThanOrEqualTo(5 * Gate);
+        Within(Percentile(latencies, 0.50), 5);
     }
 
     private static QueryPlan Plan(string query) => new QueryPlanner(new SearchEngineOptions(), TimeProvider.System).Plan(new QueryParser().Parse(query).Ast!);
@@ -185,6 +185,17 @@ public sealed class SearchPerformanceTests : IClassFixture<SearchPerformanceTest
         return times;
     }
 
+    /// <summary>Asserts the 2× regression gate; on battery power an exceeded gate is reported as skipped (throttled CPU).</summary>
+    private static void Within(double measuredMs, double budgetMs)
+    {
+        if (measuredMs > budgetMs * Gate)
+        {
+            PowerState.SkipTimingGateOnBattery();
+        }
+
+        measuredMs.Should().BeLessThanOrEqualTo(budgetMs * Gate);
+    }
+
     private static double Percentile(List<double> values, double p)
     {
         var sorted = values.Order().ToList();
@@ -195,7 +206,6 @@ public sealed class SearchPerformanceTests : IClassFixture<SearchPerformanceTest
     private static void Report(string name, List<double> times, double budgetMs)
     {
         TestContext.Current.SendDiagnosticMessage($"{name}: p50 {Percentile(times, 0.5):F2} ms, p95 {Percentile(times, 0.95):F2} ms, min {times.Min():F2} ms (budget {budgetMs} ms)");
-        PowerState.SkipTimingGateOnBattery();
     }
 
     public sealed class MillionEntries
