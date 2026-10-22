@@ -24,7 +24,7 @@ public sealed class SearchEngine : ISearchEngine, IDisposable
     private readonly ISemanticSearch? _semantic;
     private readonly ITagLookup? _tags;
     private readonly QueryPlanner _planner;
-    private readonly LinkedList<(SearchRequest Request, SearchResult Result)> _recent = new();
+    private readonly LinkedList<(SearchRequest Request, SearchResult Result, RefinementBuffer? Names)> _recent = new();
     private readonly Lock _recentGate = new();
     private readonly LiveQueryHub _hub;
     private long _hashesComputed;
@@ -93,12 +93,12 @@ public sealed class SearchEngine : ISearchEngine, IDisposable
 
         var warnings = new List<string>(plan.Warnings);
         await ResolveLookupsAsync(plan, warnings, ct).ConfigureAwait(false);
-        var candidates = EvaluateCore(plan, request, snapshot, ct);
+        var candidates = EvaluateCore(plan, request, snapshot, out var names, ct);
 
         if (plan.PostFilters.Count == 0)
         {
             var result = Finish(candidates, request, snapshot, watch, warnings);
-            Remember(request, result);
+            Remember(request, result, names);
             yield return result;
             yield break;
         }
@@ -167,18 +167,107 @@ public sealed class SearchEngine : ISearchEngine, IDisposable
 
     /// <summary>Evaluates the memory part of a plan (scope included) and returns matching refs in index order.</summary>
     public List<EntryRef> Evaluate(QueryPlan plan, SearchRequest request, IIndexSnapshot snapshot, CancellationToken ct) =>
-        EvaluateCore(plan, request, snapshot, ct);
+        EvaluateCore(plan, request, snapshot, out _, ct);
 
-    private List<EntryRef> EvaluateCore(QueryPlan plan, SearchRequest request, IIndexSnapshot snapshot, CancellationToken ct)
+    private List<EntryRef> EvaluateCore(QueryPlan plan, SearchRequest request, IIndexSnapshot snapshot, out RefinementBuffer? names, CancellationToken ct)
     {
         var predicate = WithScope(plan.Memory, request.Scope);
         predicate.Prepare(snapshot, ct);
-        if (plan.IsRefinement && request.RefinementOf is not null && TryRecall(request.RefinementOf, snapshot.Generation, out var previous))
+        var nameOnly = predicate.SupportsNameOnly;
+        if (plan.IsRefinement && request.RefinementOf is not null && TryRecall(request.RefinementOf, snapshot.Generation, out var previous, out var previousNames))
         {
+            if (nameOnly && previousNames is not null)
+            {
+                names = previousNames.Refine(predicate, out var refinedItems, ct);
+                return refinedItems;
+            }
+
+            names = null;
             return ScanCandidates(previous, predicate, snapshot, ct);
         }
 
+        if (nameOnly)
+        {
+            names = ScanAllWithNames(predicate, snapshot, out var items, ct);
+            return items;
+        }
+
+        names = null;
         return ScanAll(predicate, snapshot, ct);
+    }
+
+    /// <summary>Full parallel scan for name-only predicates that also captures the folded names of the matches into a
+    /// <see cref="RefinementBuffer"/>, so the next keystroke refines over contiguous memory.</summary>
+    private RefinementBuffer? ScanAllWithNames(Predicate predicate, IIndexSnapshot snapshot, out List<EntryRef> items, CancellationToken ct)
+    {
+        var partitions = new List<(int Segment, int Start, int End)>();
+        var size = Math.Max(1024, _options.PartitionSize);
+        for (var s = 0; s < snapshot.SegmentCount; s++)
+        {
+            if (snapshot is IndexGeneration g && !g.HasSegment(s))
+            {
+                continue;
+            }
+
+            var count = snapshot.Count(s);
+            for (var start = 1; start < count; start += size)
+            {
+                partitions.Add((s, start, Math.Min(count, start + size)));
+            }
+        }
+
+        var chunks = new RefinementBuffer.Chunk[partitions.Count];
+        var checkMask = CheckMask(predicate);
+        Parallel.For(0, partitions.Count, new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = Environment.ProcessorCount }, p =>
+        {
+            var (s, start, end) = partitions[p];
+            chunks[p] = ScanPartitionWithNames(snapshot.GetSegment(s), start, end, predicate, checkMask, ct);
+        });
+        ct.ThrowIfCancellationRequested();
+        var buffer = RefinementBuffer.Create(chunks);
+        items = buffer?.ToList() ?? Flatten(chunks);
+        return buffer;
+    }
+
+    /// <summary>One partition of <see cref="ScanAllWithNames"/>; fully optimized from the first call (typing must be fast
+    /// before tiered compilation has promoted the method).</summary>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
+    private static RefinementBuffer.Chunk ScanPartitionWithNames(IndexSegment segment, int start, int end, Predicate predicate, int checkMask, CancellationToken ct)
+    {
+        var builder = new RefinementBuffer.Builder(segment.Id);
+        for (var i = start; i < end; i++)
+        {
+            if ((i & checkMask) == 0 && ct.IsCancellationRequested)
+            {
+                break; // the caller throws once after the loop
+            }
+
+            var flags = segment.GetFlags(i);
+            if ((flags & IndexEntryState.Deleted) != 0)
+            {
+                continue;
+            }
+
+            var name = segment.GetFoldedName(i);
+            var isDirectory = (flags & IndexEntryState.Directory) != 0;
+            if (predicate.MatchName(name, isDirectory))
+            {
+                builder.Add(i, name, isDirectory);
+            }
+        }
+
+        return builder.Build();
+    }
+
+    private static List<EntryRef> Flatten(RefinementBuffer.Chunk[] chunks)
+    {
+        var list = new List<EntryRef>(chunks.Sum(c => c.Count));
+        foreach (var chunk in chunks)
+        {
+            chunk.AppendRefs(list);
+        }
+
+        return list;
     }
 
     /// <summary>Combines the memory predicate with the request scope (subtree of any scope root).</summary>
@@ -601,11 +690,31 @@ public sealed class SearchEngine : ISearchEngine, IDisposable
         }
     }
 
-    private void Remember(SearchRequest request, SearchResult result)
+    private void Remember(SearchRequest request, SearchResult result, RefinementBuffer? names)
     {
         lock (_recentGate)
         {
-            _recent.AddFirst((request, result));
+            // Re-running a request replaces its entry instead of pushing the refinement base out of the cache.
+            for (var existing = _recent.First; existing is not null; existing = existing.Next)
+            {
+                if (ReferenceEquals(existing.Value.Request, request))
+                {
+                    _recent.Remove(existing);
+                    break;
+                }
+            }
+
+            // Only the newest results keep their name buffers (memory bound); older ones still refine via the index.
+            var node = _recent.First;
+            for (var i = 0; node is not null; i++, node = node.Next)
+            {
+                if (i >= 1 && node.Value.Names is not null)
+                {
+                    node.Value = (node.Value.Request, node.Value.Result, null);
+                }
+            }
+
+            _recent.AddFirst((request, result, names));
             while (_recent.Count > RefinementCacheSize)
             {
                 _recent.RemoveLast();
@@ -613,21 +722,23 @@ public sealed class SearchEngine : ISearchEngine, IDisposable
         }
     }
 
-    private bool TryRecall(SearchRequest request, long generation, out IReadOnlyList<EntryRef> items)
+    private bool TryRecall(SearchRequest request, long generation, out IReadOnlyList<EntryRef> items, out RefinementBuffer? names)
     {
         lock (_recentGate)
         {
-            foreach (var (r, result) in _recent)
+            foreach (var (r, result, buffer) in _recent)
             {
                 if (ReferenceEquals(r, request) && result.Generation == generation && !result.Truncated)
                 {
                     items = result.Items;
+                    names = buffer;
                     return true;
                 }
             }
         }
 
         items = [];
+        names = null;
         return false;
     }
 }

@@ -11,6 +11,8 @@ namespace NexPane.Indexing.Ntfs;
 /// </summary>
 public sealed class NtfsVolumeBackend : IIndexVolumeBackend
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, HashSet<ulong>> _excludedDirectories = new(StringComparer.OrdinalIgnoreCase);
+
     public const int BatchSize = 4096;
     public static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(250);
 
@@ -59,15 +61,17 @@ public sealed class NtfsVolumeBackend : IIndexVolumeBackend
         var info = Find(volumeGuid);
         using var volume = NtfsVolume.Open(info.Root);
         volume.TryQueryJournal(out var journal, out _);
-        var mft = await Task.Run(() => MftReader.ReadAll(volume, ct), ct).ConfigureAwait(false);
+        var all = await Task.Run(() => MftReader.ReadAll(volume, ct), ct).ConfigureAwait(false);
+        var mft = NtfsMetafiles.Exclude(all); // $MFT, $LogFile, $Extend subtree ($Quota, $UsnJrnl, ...) are not user files (walker parity)
+        _excludedDirectories[volumeGuid] = NtfsMetafiles.ExcludedDirectories(all, mft);
         var filter = new AccessFilter(canList);
         var visible = filter.Filter(mft, info.RootFileReference, info.Root, frn => mft.TryGetValue(frn, out var s) ? s.SecurityId : 0);
         var batch = new List<WireEntry>(BatchSize);
         foreach (var entry in visible)
         {
-            if (entry.Name is null || entry.Name.StartsWith('$') && entry.ParentReference == info.RootFileReference)
+            if (entry.Name is null)
             {
-                continue; // NTFS metadata files ($MFT, $LogFile, ...) are not user files
+                continue;
             }
 
             batch.Add(new WireEntry(entry.FileReference, entry.ParentReference, entry.Attributes, entry.Size, entry.ModifiedUtc, entry.CreatedUtc, entry.Name));
@@ -93,6 +97,7 @@ public sealed class NtfsVolumeBackend : IIndexVolumeBackend
         var info = Find(volumeGuid);
         using var volume = NtfsVolume.Open(info.Root);
         var verdicts = new Dictionary<ulong, bool> { [info.RootFileReference] = canList(info.Root) };
+        var excluded = _excludedDirectories.GetValueOrDefault(volumeGuid) ?? [];
         var buffer = new byte[64 * 1024];
         var next = fromUsn;
         using var timer = new PeriodicTimer(PollInterval);
@@ -115,7 +120,8 @@ public sealed class NtfsVolumeBackend : IIndexVolumeBackend
                 var changes = new List<WireChange>();
                 foreach (var record in parsed.Records)
                 {
-                    if (record.FileName is null || !Listable(volume, record.ParentReferenceLow, verdicts, canList))
+                    if (record.FileName is null || NtfsMetafiles.IsExcludedChange(record.FileReferenceLow, record.ParentReferenceLow, excluded) ||
+                        !Listable(volume, record.ParentReferenceLow, verdicts, canList))
                     {
                         continue;
                     }

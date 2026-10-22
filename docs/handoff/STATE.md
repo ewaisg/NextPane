@@ -53,7 +53,7 @@ Benchmarks (`dotnet run -c Release --project tests/NexPane.Benchmarks -- --filte
 | Budget (§17) | Measured (mean) | Verdict |
 |---|---|---|
 | Cold substring 1M: p50 ≤ 5 ms, p95 ≤ 15 ms | 0.81–1.40 ms (`invoice_00`); unit test p95 over 8 queries incl. broad ones is within 2× | met |
-| Incremental refinement 1M: p50 ≤ 1 ms, p95 ≤ 3 ms | 0.65–1.02 ms for a narrow keystroke; broad early keystrokes (80k–170k candidates) are about 2.9 ms p50 in the unit test on AC power | **p50 missed for broad keystrokes** (P3.24 open) |
+| Incremental refinement 1M: p50 ≤ 1 ms, p95 ≤ 3 ms | After the P3.24 fix, on AC: broad `in`→`inv` median 0.60 ms, `re`→`rep` 0.66 ms, `invoice_0`→`invoice_00` 0.14 ms, narrow 53 µs. Before: broad keystrokes about 2.9 ms p50 | met (fixed 2026-10-22 c) |
 | Cold substring 5M: p95 ≤ 60 ms | 8.0 ms | met |
 | Name regex NonBacktracking 1M: p95 ≤ 150 ms | 48.8–55.5 ms (`(a+)+$`) | met |
 | `path:` dir-set 1M: ≤ 50 ms | 27.7–33.6 ms | met |
@@ -100,7 +100,7 @@ TODO totals: 183 items: 9 VERIFIED_COMPLETE, 5 READY_FOR_QA, the rest PENDING.
 |---|---|---|---|
 | P1.02 uninstall purge mechanism | S1 | `[IN_PROGRESS]` (QA reject) | Replace `ExecAsOriginalUser` (unsupported at uninstall) with a supported mechanism, record in §21, update P4.43/P7.14 acceptance; then S6 re-runs |
 | Phase 2 (branding/assets) | **S7** | `[PENDING]` | Start with P2.01 (logo SVGs), then P2.02 (`tools\NexPane.AssetGen`) |
-| Phase 3 (core FS, indexer, search) | **S2** | 27 `[READY_FOR_QA]`, 7 `[IN_PROGRESS]` | Branch `phase3-core-search` (worktree `.worktreesphase3`). Open: run the `[Elevated]` tests for P3.10–P3.14 and P3.18; speed up broad keystroke refinement (P3.24 p50). Then S6 runs P3.36 |
+| Phase 3 (core FS, indexer, search) | **S2** | 32 `[READY_FOR_QA]`, 2 `[IN_PROGRESS]` (P3.10, P3.11: metafile fix awaiting the elevated re-run) | Branch `phase3-core-search` (worktree `.worktrees\phase3`). Next: the user re-runs `eng\run-elevated-tests.ps1`, then S6 runs P3.36 |
 
 ## 5. Active issues / risks
 1. **Deviations from the original plan** (all recorded in ARCHITECTURE §21):
@@ -137,6 +137,16 @@ git check-ignore src/NexPane.Core/Models/VfsEntry.cs src/NexPane.Security/Secret
 ```
 
 ## 7. Session log
+
+### 2026-10-22 (c) — Subagent 2: P3.24 fix, NTFS metafile exclusion
+- P3.24: added `RefinementBuffer`, which keeps contiguous folded names per result partition; refinement is a vectorized scan and selects without copying.
+  - Before: broad keystrokes about 2.9 ms p50 (unit chain, AC) / 1.9 ms (probe, battery).
+  - After, on AC (BenchmarkDotNet `BroadRefinementBenchmarks`, base query in iteration setup): `in`→`inv` median 0.60 ms, `re`→`rep` 0.66 ms, `invoice_0`→`invoice_00` 0.14 ms; narrow keystroke 53 µs.
+  - The unit test asserts p50 ≤ 1 ms and p95 ≤ 3 ms again (2× gate).
+  - Cost: cold name-only queries now copy their matches' names, e.g. cold `invoice_00` 1.8–1.9 ms (was 0.8–1.4 ms) and cold `in` (167k results) 5.2–6.6 ms. Both remain within the cold budget (p95 ≤ 15 ms).
+- The elevated run by the user found a product bug: NTFS metafiles (`$Quota`, …) were indexed. They are now excluded by record number and `$Extend` ancestry in enumeration and journal; in-process elevated mode applies the user's AccessCheck (walker parity). Unit-tested; the elevated test asserts parity with directory enumeration.
+- 4 of 5 elevated tests had passed in that run; the 5th needs a re-run of `eng\run-elevated-tests.ps1` (added by the orchestrator, committed unchanged).
+- Default suite 744: 741 passed, 0 failed, 3 skipped. Scanner: 92 files, exit 0.
 
 ### 2026-10-22 — Subagent 2 (Core Systems & Indexing Engine Engineer)
 - Phase 3 on branch `phase3-core-search` (worktree `C:\Users\Ewais\Projects\NexPane\.worktrees\phase3`), 13 commits from `2017395` to the docs commit; not merged into main (the orchestrator merges).

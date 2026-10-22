@@ -86,6 +86,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\check-placeholders.ps1
 dotnet test --solution NexPane.sln -c Release --filter-not-trait "Category=Elevated" --filter-not-trait "Category=Live"
 # Elevated suite (from an elevated terminal):
 dotnet test --solution NexPane.sln -c Release --filter-trait "Category=Elevated"
+# Or, for the Phase 3 suites (Indexing + IndexService; VHDX via diskpart, SMB share), with a log for QA in build\elevated-tests.log (UTF-16):
+powershell -NoProfile -ExecutionPolicy Bypass -File eng\run-elevated-tests.ps1
 # Single project:
 dotnet test --project tests/NexPane.Architecture.Tests -c Release
 # Benchmarks

@@ -22,6 +22,14 @@ public abstract class Predicate
 
     public abstract bool Match(IndexSegment segment, int index);
 
+    /// <summary>True when the predicate needs only the folded name and the directory flag, so keystroke refinement can
+    /// evaluate it over a result's contiguous name buffer instead of the index (§7.2 incremental refinement).</summary>
+    public virtual bool SupportsNameOnly => false;
+
+    /// <summary>Name-only evaluation; call only when <see cref="SupportsNameOnly"/> is true.</summary>
+    public virtual bool MatchName(ReadOnlySpan<char> foldedName, bool isDirectory) =>
+        throw new InvalidOperationException($"{GetType().Name} needs index columns; check SupportsNameOnly first.");
+
     public abstract string Describe();
 }
 
@@ -36,6 +44,10 @@ public sealed class ConstantPredicate(bool value) : Predicate
     public override int Cost => 0;
 
     public override bool Match(IndexSegment segment, int index) => Value;
+
+    public override bool SupportsNameOnly => true;
+
+    public override bool MatchName(ReadOnlySpan<char> foldedName, bool isDirectory) => Value;
 
     public override string Describe() => Value ? "true" : "false";
 }
@@ -63,6 +75,21 @@ public sealed class AndPredicate(IReadOnlyList<Predicate> operands) : Predicate
         foreach (var o in _operands)
         {
             if (!o.Match(segment, index))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public override bool SupportsNameOnly => _operands.All(o => o.SupportsNameOnly);
+
+    public override bool MatchName(ReadOnlySpan<char> foldedName, bool isDirectory)
+    {
+        foreach (var o in _operands)
+        {
+            if (!o.MatchName(foldedName, isDirectory))
             {
                 return false;
             }
@@ -105,6 +132,21 @@ public sealed class OrPredicate(IReadOnlyList<Predicate> operands) : Predicate
         return false;
     }
 
+    public override bool SupportsNameOnly => _operands.All(o => o.SupportsNameOnly);
+
+    public override bool MatchName(ReadOnlySpan<char> foldedName, bool isDirectory)
+    {
+        foreach (var o in _operands)
+        {
+            if (o.MatchName(foldedName, isDirectory))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public override string Describe() => "OR[" + string.Join(", ", _operands.Select(o => o.Describe())) + "]";
 }
 
@@ -120,6 +162,10 @@ public sealed class NotPredicate(Predicate operand) : Predicate
 
     public override bool Match(IndexSegment segment, int index) => !Operand.Match(segment, index);
 
+    public override bool SupportsNameOnly => Operand.SupportsNameOnly;
+
+    public override bool MatchName(ReadOnlySpan<char> foldedName, bool isDirectory) => !Operand.MatchName(foldedName, isDirectory);
+
     public override string Describe() => "NOT " + Operand.Describe();
 }
 
@@ -133,6 +179,10 @@ public sealed class NameSubstringPredicate(string foldedNeedle) : Predicate
     public override bool Match(IndexSegment segment, int index) =>
         segment.GetFoldedName(index).IndexOf(Needle.AsSpan()) >= 0;
 
+    public override bool SupportsNameOnly => true;
+
+    public override bool MatchName(ReadOnlySpan<char> foldedName, bool isDirectory) => foldedName.IndexOf(Needle.AsSpan()) >= 0;
+
     public override string Describe() => "name~" + Needle;
 }
 
@@ -145,6 +195,10 @@ public sealed class NameGlobPredicate(string foldedPattern) : Predicate
     public override int Cost => 3;
 
     public override bool Match(IndexSegment segment, int index) => _glob.IsMatch(segment.GetFoldedName(index));
+
+    public override bool SupportsNameOnly => true;
+
+    public override bool MatchName(ReadOnlySpan<char> foldedName, bool isDirectory) => _glob.IsMatch(foldedName);
 
     public override string Describe() => "glob:" + Pattern;
 }
@@ -183,6 +237,19 @@ public sealed class ExtensionPredicate : Predicate
 
     public override bool Match(IndexSegment segment, int index) =>
         !segment.IsDirectory(index) && _lookup.Contains(segment.GetFoldedExtension(index));
+
+    public override bool SupportsNameOnly => true;
+
+    public override bool MatchName(ReadOnlySpan<char> foldedName, bool isDirectory)
+    {
+        if (isDirectory)
+        {
+            return false;
+        }
+
+        var dot = foldedName.LastIndexOf('.');
+        return dot > 0 && dot < foldedName.Length - 1 && _lookup.Contains(foldedName[(dot + 1)..]);
+    }
 
     public override string Describe() => Description;
 }
@@ -259,6 +326,10 @@ public sealed class KindPredicate(bool directories) : Predicate
     public override int Cost => 1;
 
     public override bool Match(IndexSegment segment, int index) => segment.IsDirectory(index) == directories;
+
+    public override bool SupportsNameOnly => true;
+
+    public override bool MatchName(ReadOnlySpan<char> foldedName, bool isDirectory) => isDirectory == directories;
 
     public override string Describe() => directories ? "type:folder" : "type:file";
 }

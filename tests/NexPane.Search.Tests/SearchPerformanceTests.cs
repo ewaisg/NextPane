@@ -141,8 +141,7 @@ public sealed class SearchPerformanceTests : IClassFixture<SearchPerformanceTest
 
         times.Should().NotBeEmpty();
         Report("Incremental refinement (keystroke) over 1M", times, budgetMs: 3);
-        // p50 is reported only: early broad keystrokes (80k-170k candidates) take 2-3 ms here, above the 1 ms p50 budget
-        // (tracked open in TODO P3.24); narrow refinements measure 0.65 ms in SearchBenchmarks.IncrementalRefinement1M.
+        Within(Percentile(times, 0.50), 1);
         Within(Percentile(times, 0.95), 3);
     }
 
@@ -199,7 +198,7 @@ public sealed class SearchPerformanceTests : IClassFixture<SearchPerformanceTest
     {
         if (measuredMs > budgetMs * Gate)
         {
-            PowerState.SkipTimingGateOnBattery();
+            Assert.SkipWhen(PowerState.OnBattery, $"Timing gate skipped on battery power (CPU throttled): measured {measuredMs:F2} ms, gate {budgetMs * Gate:F2} ms (2x the {budgetMs} ms budget). Correctness assertions passed."); // see PowerState
         }
 
         measuredMs.Should().BeLessThanOrEqualTo(budgetMs * Gate);

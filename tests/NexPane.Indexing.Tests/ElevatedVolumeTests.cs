@@ -50,9 +50,20 @@ public sealed class ElevatedVolumeTests : IAsyncLifetime
 
         await WaitFor(() => Count(store, segment, n => n.StartsWith('f')) == 10_000, TimeSpan.FromSeconds(30));
 
-        // Sizes from the raw $MFT equal GetFileInformationByHandleEx (FileInfo) values.
+        // Parity with a directory enumeration (what the walker sees): no $MFT/$Extend metafiles, nothing the user cannot list.
         var snapshot = store.CurrentGeneration;
         var seg = snapshot.GetSegment(segment.Id);
+        var indexed = Enumerable.Range(1, snapshot.Count(segment.Id) - 1).Where(i => !seg.IsDeleted(i)).Select(seg.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var enumerated = Directory.EnumerateFileSystemEntries(root, "*", new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            AttributesToSkip = 0,
+            IgnoreInaccessible = true,
+        }).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        indexed.Should().NotContain(p => Path.GetFileName(p).StartsWith('$') && !enumerated.Contains(p));
+        indexed.Should().BeEquivalentTo(enumerated);
+
+        // Sizes from the raw $MFT equal GetFileInformationByHandleEx (FileInfo) values.
         for (var i = 1; i < snapshot.Count(segment.Id); i += 97)
         {
             if (!seg.IsDeleted(i) && !seg.IsDirectory(i))

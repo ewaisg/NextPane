@@ -2,6 +2,7 @@ using NexPane.Core.Indexing;
 using NexPane.Indexing.Service;
 using NexPane.Indexing.Store;
 using NexPane.Shell.FileSystem;
+using NexPane.Shell.Security;
 
 namespace NexPane.Indexing.Ntfs;
 
@@ -68,6 +69,8 @@ public sealed class UsnVolumeSource(IndexStore store, SegmentHandle segment, Vol
     {
         ArgumentNullException.ThrowIfNull(backend);
         ArgumentNullException.ThrowIfNull(persisted);
+        // Same privacy rule as the service: only what this user could list (walker parity, e.g. System Volume Information).
+        using var access = DirectoryAccessCheck.ForCurrentUser();
         var journal = new UsnJournalInfo(volume.JournalId, 0, volume.NextUsn, 0, long.MaxValue, 0, 0);
         Decision = JournalResume.Decide(persisted.JournalId, persisted.LastUsn, journal);
         var from = Decision.StartUsn;
@@ -76,7 +79,7 @@ public sealed class UsnVolumeSource(IndexStore store, SegmentHandle segment, Vol
             if (Decision.Mode == JournalStartMode.FullScan)
             {
                 await store.ResetVolumeAsync(segment.Id, ct).ConfigureAwait(false);
-                from = await backend.EnumerateAsync(volume.VolumeGuid, _ => true, batch => store.SubmitAsync(segment.Id, batch.Select(e =>
+                from = await backend.EnumerateAsync(volume.VolumeGuid, access.CanList, batch => store.SubmitAsync(segment.Id, batch.Select(e =>
                     IndexDelta.UpsertById(e.FileReference, e.ParentReference, e.Name, e.Attributes, e.Size, e.ModifiedUtc, e.CreatedUtc)).ToList(), ct).AsTask(), ct).ConfigureAwait(false);
                 await store.FlushAsync(ct).ConfigureAwait(false);
                 FullScans++;
@@ -86,7 +89,7 @@ public sealed class UsnVolumeSource(IndexStore store, SegmentHandle segment, Vol
             try
             {
                 using var volumeHandle = NtfsVolume.Open(volume.Root);
-                await backend.SubscribeAsync(volume.VolumeGuid, from, _ => true, async changes =>
+                await backend.SubscribeAsync(volume.VolumeGuid, from, access.CanList, async changes =>
                 {
                     var records = changes.Select(c => new UsnRecord(3, 0, c.FileReference, c.ParentReference, c.Usn, 0, (UsnReason)c.Reason, 0, 0,
                         c.Attributes, c.Name, [], 0)).ToList();

@@ -127,6 +127,55 @@ public sealed class UsnLogicTests
         mft.Values.Should().Contain(s => s.Name == "Windows" && s.IsDirectory);
     }
 
+    [Fact]
+    public void Ntfs_metafiles_and_the_extend_subtree_are_excluded_by_identity_not_by_name()
+    {
+        static ulong Ref(ulong record, ulong sequence = 1) => record | (sequence << 48);
+        var root = Ref(5, 5);
+        var entries = new Dictionary<ulong, MftStat>
+        {
+            [root] = Dir(root, root, "", 1),
+            [Ref(0)] = File(Ref(0), root, "$MFT"),
+            [Ref(2)] = File(Ref(2), root, "$LogFile"),
+            [Ref(6)] = File(Ref(6), root, "$Bitmap"),
+            [Ref(11)] = Dir(Ref(11), root, "$Extend", 1),
+            [Ref(24)] = File(Ref(24), Ref(11), "$Quota"),
+            [Ref(25)] = File(Ref(25), Ref(11), "$ObjId"),
+            [Ref(27)] = Dir(Ref(27), Ref(11), "$RmMetadata", 1),
+            [Ref(28)] = Dir(Ref(28), Ref(27), "$Txf", 1),
+            [Ref(29)] = File(Ref(29), Ref(28), "log.blf"),
+            [Ref(40)] = File(Ref(40), root, "$user-file.txt"),
+            [Ref(41)] = Dir(Ref(41), root, "$projects", 1),
+            [Ref(42)] = File(Ref(42), Ref(41), "notes.txt"),
+            [Ref(43)] = File(Ref(43), root, "readme.md"),
+        };
+
+        var kept = NtfsMetafiles.Exclude(entries);
+
+        kept.Values.Select(e => e.Name).Should().BeEquivalentTo("", "$user-file.txt", "$projects", "notes.txt", "readme.md");
+        var excludedDirectories = NtfsMetafiles.ExcludedDirectories(entries, kept);
+        excludedDirectories.Should().BeEquivalentTo([Ref(11), Ref(27), Ref(28)]);
+
+        // Journal changes: metafiles and anything below $Extend are dropped; user "$" names are kept.
+        NtfsMetafiles.IsExcludedChange(Ref(0), root, excludedDirectories).Should().BeTrue();
+        NtfsMetafiles.IsExcludedChange(Ref(77), Ref(11), excludedDirectories).Should().BeTrue();
+        NtfsMetafiles.IsExcludedChange(Ref(78), Ref(28), excludedDirectories).Should().BeTrue();
+        NtfsMetafiles.IsExcludedChange(Ref(79), root, excludedDirectories).Should().BeFalse();
+        NtfsMetafiles.IsExcludedChange(Ref(80), Ref(41), excludedDirectories).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Journal_fixture_records_pass_the_metafile_filter()
+    {
+        var path = Path.Combine(Path.GetDirectoryName(ContentFixtures.Directory)!, "usn", "journal-v3.bin");
+        var parsed = UsnRecordParser.ParseBuffer(System.IO.File.ReadAllBytes(path));
+
+        parsed.Records.Should().NotBeEmpty();
+        parsed.Records.Should().AllSatisfy(r => NtfsMetafiles.IsExcludedChange(r.FileReferenceLow, r.ParentReferenceLow, new HashSet<ulong>()).Should().BeFalse());
+        NtfsMetafiles.IsReserved(0x0005000000000005).Should().BeFalse("the root directory is not a metafile");
+        NtfsMetafiles.IsReserved(0x000100000000000B).Should().BeTrue("record 11 is $Extend");
+    }
+
     private static UsnRecord Record(ulong frn, ulong parent, string name, UsnReason reason) =>
         new(2, 0, frn, parent, 0, 0, reason, 0, 0, 0x20, name, [], 0);
 
