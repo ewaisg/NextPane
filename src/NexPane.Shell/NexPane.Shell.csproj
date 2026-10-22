@@ -2,7 +2,13 @@
 
   <PropertyGroup>
     <RootNamespace>NexPane.Shell</RootNamespace>
+    <!-- Win32/COM interop: LibraryImport source-generated P/Invoke and fixed-size buffers in native structs. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="NexPane.Shell.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\NexPane.Core\NexPane.Core.csproj" />
