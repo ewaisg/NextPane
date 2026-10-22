@@ -256,3 +256,46 @@ public static class FileById
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern unsafe bool GetFileInformationByHandleEx(SafeFileHandle file, int infoClass, void* info, uint size);
 }
+
+/// <summary>Resolves the current full path of a file by reference number (<c>OpenFileById</c> +
+/// <c>GetFinalPathNameByHandleW</c>).</summary>
+public static class FileReferencePath
+{
+    public static unsafe string? TryGet(SafeFileHandle anyHandleOnVolume, ulong fileReference)
+    {
+        ArgumentNullException.ThrowIfNull(anyHandleOnVolume);
+        var descriptor = new Descriptor { Size = (uint)sizeof(Descriptor), Type = 0, FileId = (long)fileReference };
+        using var file = OpenFileById(anyHandleOnVolume, ref descriptor, 0, Win32FileApi.FileShareAll, IntPtr.Zero, Win32FileApi.FileFlagBackupSemantics);
+        if (file.IsInvalid)
+        {
+            return null;
+        }
+
+        var buffer = stackalloc char[1024];
+        var length = GetFinalPathNameByHandle(file, buffer, 1024, 0);
+        if (length == 0 || length >= 1024)
+        {
+            return null;
+        }
+
+        var path = new string(buffer, 0, (int)length);
+        return path.StartsWith(@"\?\UNC\", StringComparison.Ordinal) ? @"\\" + path[8..]
+            : path.StartsWith(@"\?\", StringComparison.Ordinal) ? path[4..] : path;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Descriptor
+    {
+        public uint Size;
+        public int Type;
+        public long FileId;
+        public long Padding;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern SafeFileHandle OpenFileById(SafeFileHandle volumeHint, ref Descriptor fileId, uint desiredAccess, uint shareMode,
+        IntPtr securityAttributes, uint flagsAndAttributes);
+
+    [DllImport("kernel32.dll", EntryPoint = "GetFinalPathNameByHandleW", SetLastError = true)]
+    private static extern unsafe uint GetFinalPathNameByHandle(SafeFileHandle file, char* path, uint length, uint flags);
+}

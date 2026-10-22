@@ -108,6 +108,10 @@ public sealed class IndexStore : IIndexSnapshotSource, IAsyncDisposable
     /// <summary>Forces compaction of a segment (normally automatic above the tombstone ratio).</summary>
     public Task CompactAsync(int segment, CancellationToken ct) => Enqueue<bool>(tcs => new Command(CommandKind.Compact, segment, null, tcs), ct);
 
+    /// <summary>Full paths of entries by file id (resolved on the writer thread through the id map; null when unknown).</summary>
+    public Task<IReadOnlyDictionary<ulong, string?>> ResolvePathsAsync(int segment, IReadOnlyCollection<ulong> fileIds, CancellationToken ct) =>
+        Enqueue<IReadOnlyDictionary<ulong, string?>>(tcs => new Command(CommandKind.Resolve, segment, null, tcs) { FileIds = fileIds }, ct);
+
     public Task UpdateVolumeInfoAsync(int segment, IndexVolumeInfo volume, CancellationToken ct) =>
         Enqueue<bool>(tcs => new Command(CommandKind.SetVolume, segment, null, tcs) { Volume = volume }, ct);
 
@@ -292,6 +296,19 @@ public sealed class IndexStore : IIndexSnapshotSource, IAsyncDisposable
                 state.PersistAll = true;
                 completions.Add(() => ((TaskCompletionSource<bool>)command.Completion!).TrySetResult(true));
                 return true;
+            }
+
+            case CommandKind.Resolve:
+            {
+                var state = GetState(command.Segment);
+                var paths = new Dictionary<ulong, string?>();
+                foreach (var id in command.FileIds ?? [])
+                {
+                    paths[id] = state is not null && state.Maps.TryGetById(id, out var index) ? state.Segment.GetFullPath(index) : null;
+                }
+
+                completions.Add(() => ((TaskCompletionSource<IReadOnlyDictionary<ulong, string?>>)command.Completion!).TrySetResult(paths));
+                return false;
             }
 
             case CommandKind.Capture:
@@ -885,6 +902,9 @@ public sealed class IndexStore : IIndexSnapshotSource, IAsyncDisposable
             case TaskCompletionSource<IReadOnlyList<PersistBatch>> p:
                 p.TrySetException(ex);
                 break;
+            case TaskCompletionSource<IReadOnlyDictionary<ulong, string?>> r:
+                r.TrySetException(ex);
+                break;
             default:
                 throw new InvalidOperationException("Unknown completion type.", ex);
         }
@@ -900,6 +920,7 @@ public sealed class IndexStore : IIndexSnapshotSource, IAsyncDisposable
         Compact,
         SetVolume,
         Capture,
+        Resolve,
     }
 
     private sealed record Command(CommandKind Kind, int Segment, IReadOnlyList<IndexDelta>? Deltas, object? Completion)
@@ -909,6 +930,8 @@ public sealed class IndexStore : IIndexSnapshotSource, IAsyncDisposable
         public ulong RootFileId { get; init; }
 
         public bool Full { get; init; }
+
+        public IReadOnlyCollection<ulong>? FileIds { get; init; }
     }
 
     private sealed class SegmentState(SegmentHandle handle, IndexSegment segment, SegmentMaps maps)
