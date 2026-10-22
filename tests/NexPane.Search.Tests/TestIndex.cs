@@ -120,21 +120,30 @@ internal sealed class TestIndex : IIndexSnapshotSource
         var random = new Random(seed);
         var segment = index.Segment;
         var directories = new List<int> { 0 };
+        var depths = new List<int> { 0 }; // realistic trees: depth capped at 12 levels
         string[] stems = ["report", "IMG", "invoice", "notes", "backup", "Screenshot", "project", "data", "readme", "photo", "src", "bin"];
         string[] exts = ["txt", "jpg", "pdf", "docx", "cs", "png", "zip", "mp3", "json", "log"];
         var baseTime = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc).ToFileTimeUtc();
         for (var i = 0; i < count; i++)
         {
-            var parent = directories[random.Next(Math.Max(0, directories.Count - 64), directories.Count)];
-            if (random.Next(64) == 0)
+            int parent;
+            var parentSlot = Math.Max(0, directories.Count - 64) + random.Next(Math.Min(64, directories.Count));
+            if (random.Next(64) == 0 || depths[parentSlot] >= 12)
             {
-                parent = directories[random.Next(directories.Count)];
+                parentSlot = random.Next(directories.Count);
+                while (depths[parentSlot] >= 12)
+                {
+                    parentSlot = random.Next(Math.Max(1, directories.Count / 8));
+                }
             }
+
+            parent = directories[parentSlot];
 
             if (i % 10 == 0)
             {
                 var d = segment.Append((ulong)(1000 + i), parent, $"{stems[random.Next(stems.Length)]}_dir{i}", IndexEntryState.Directory, 0x10, 0, baseTime + i, baseTime);
                 directories.Add(d);
+                depths.Add(depths[parentSlot] + 1);
             }
             else
             {

@@ -60,6 +60,7 @@ PDFsharp                                           MIT                     https
 DocumentFormat.OpenXml                             MIT                     https://github.com/dotnet/Open-XML-SDK                                    [planned]
 MimeKit                                            MIT                     https://github.com/jstedfast/MimeKit                                      [planned]
 MsgReader                                          MIT                     https://github.com/Sicos1977/MSGReader                                    [planned]
+OpenMcdf (.msg reading in Indexing)              MPL-2.0                 https://github.com/ironfede/openmcdf                                  [planned]
 MetadataExtractor                                  Apache-2.0              https://github.com/drewnoakes/metadata-extractor-dotnet                   [planned]
 TagLibSharp                                        LGPL-2.1                https://github.com/mono/taglib-sharp                                      [planned]
 
