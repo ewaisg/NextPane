@@ -1,7 +1,7 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-21 (f) by Subagent 6 (QA): re-verification after S1 commit 180b0c0 — 13/14 Phase 1 items verified; P1.02 rejected (uninstall purge mechanism).
+> Last update: 2026-10-22 by Subagent 2 (Core Systems & Indexing): Phase 3 files, gotchas 24–32 (branch `phase3-core-search`). Previously: 2026-10-21 (f) by Subagent 6 (QA): re-verification after S1 commit 180b0c0 — 13/14 Phase 1 items verified; P1.02 rejected (uninstall purge mechanism).
 
 ## 1. Executive summary
 
@@ -33,6 +33,7 @@ Phase 2 (S7, branding) and Phase 3 (S2, core systems) can start in parallel now.
 | `.gitignore`, `THIRD-PARTY-NOTICES.txt`, ARCHITECTURE §22 / P1.14 sections | `[VERIFIED_COMPLETE]` (P1.07, P1.13, P1.08, P1.14). `.gitignore` is guarded by `tests/NexPane.Architecture.Tests/GitIgnoreTests.cs` |
 | `ARCHITECTURE.md` §19.3 + §21 (uninstall user-data purge) | `[IN_PROGRESS]` — P1.02 QA reject: `ExecAsOriginalUser` is unsupported at uninstall time |
 | `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss`, `eng/placeholder-allowlist.json` | Cross-references reworded to "task(s) P1.11"; the allowlist is empty; scanner exit 0 |
+| Phase 3 (S2, branch `phase3-core-search`) | `src/NexPane.Core/{Vfs,Indexing,Search}` (VfsPath, VFS contracts, index read model, query AST, search contracts); `src/NexPane.Storage` (SQLite factory, migrations, single writer, settings.json); `src/NexPane.Indexing/{Store,Sources,Content,Ntfs,Service}`; `src/NexPane.Search/{Language,Execution,Live,Tags,Categories}`; `src/NexPane.Shell/{FileSystem,Content,Security}`; `src/NexPane.IndexService/IndexPipeServer.cs`; `tests/NexPane.Benchmarks` (+README); fixtures `tests/TestAssets/{content,usn,mft}`. 27 items `[READY_FOR_QA]`; P3.10–P3.14 and P3.18 wait for their `[Elevated]` runs; P3.24 p50 open |
 | Next up | S1: fix P1.02 (purge mechanism) → S6 re-run. In parallel: S7 Phase 2 (P2.01, P2.02), S2 Phase 3 (P3.01, P3.03) |
 
 ## 3. Environment setup
@@ -150,6 +151,22 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
 21. **Inno Setup 6.7.3** is installed. ISPP `RemoveBackslash` is deprecated (it causes a warning, which fails `eng/installer.ps1`), so use `RemoveBackslashUnlessRoot`. Language-specific custom messages use a dot (`english.Name=`), not a colon. ISCC writes compile errors to stderr. Index Service setup lives in the `.iss` `[Code]` section (ARCHITECTURE §21), not in `[Run]`.
 22. **`.gitignore` rule (P1.07 fix):** the repo has `core.ignorecase=true`, so every directory pattern must be anchored (`/models/`) or scoped to a project folder (`/src/*/[Bb]in/`). Never add an unanchored folder pattern. `tests/TestAssets/**` is always re-included. Check new patterns with `git check-ignore -v <path>` and `git status --ignored`. With `-v`, a negation match (`!…`) also exits 0, so use `git check-ignore -q` (exit 1 = not ignored) to test. Long scratch paths (> 260 chars, e.g. the agent scratchpad) make `dotnet` fail with "The directory name is invalid"; use a short `%TEMP%\...` folder for throwaway projects.
 23. **Inno uninstaller limits (QA, P1.02):** `ExecAsOriginalUser`/`ShellExecAsOriginalUser` and the `runasoriginaluser` flag are **not supported at uninstall time** (Inno help, ExecAsOriginalUser › Remarks); the elevated uninstaller's `{localappdata}`/`{userappdata}` may be the admin's profile. Inno Pascal cannot call WinRT (`PasswordVault`). Design per-user cleanup around these limits. `.gitignore` regressions are caught by `GitIgnoreTests`.
+24. **Use absolute paths everywhere (worktrees).** In PowerShell, `[IO.File]` and other .NET calls resolve relative paths against the *process* directory, not `Set-Location`. In a worktree, a relative path silently writes into the main checkout. The Write/Edit tools also resolve relative paths against the main checkout.
+25. **Index layering (§21):** the index read model (`IndexSegment`, `IndexGeneration`) lives in Core so that Search can scan it without referencing Indexing. Only the index writer thread may call the `IndexSegment` mutation methods. Readers capture `IndexStore.CurrentGeneration` and bound iteration by `Count(segment)`.
+26. **xUnit v3 analyzers** require `TestContext.Current.CancellationToken` for every CancellationToken parameter in tests (xUnit1051 is an error under warnings-as-errors).
+27. **Placeholder scanner traps in src:**
+    - the word "placeholder" in comments;
+    - `mock`/`fake`/`stub` anywhere in identifiers or text;
+    - comment-only `catch` blocks (give them a statement);
+    - `Task.Delay` (use `PeriodicTimer` or a timed `SemaphoreSlim.Wait`).
+28. **Named pipes:** the server can impersonate the client (`RunAsClient`) only after it has read data from it. The Index Service therefore impersonates after the client's `Hello`.
+29. **Parent-index directory times:** a listing reports a sub-directory's mtime from the parent's index entry, which can be stale. The crawler stats each sub-directory itself before deciding to skip its listing.
+30. **MsgReader is not used** (it pulls in Maui.Graphics and Win2D). `.msg` text comes from OpenMcdf (§21). The PdfPig NuGet id is `PdfPig`, not `UglyToad.PdfPig`.
+31. **Timing tests and power:** the unit suite asserts 2× the §17 budgets and skips only when a gate is exceeded on battery power. Precise numbers come from `tests/NexPane.Benchmarks`, run on AC power.
+32. **Elevated suites:**
+    - `--filter-trait "Category=Elevated"` on `tests/NexPane.Indexing.Tests` creates and mounts a 256 MB VHDX with diskpart (no Hyper-V module needed);
+    - the same filter on `tests/NexPane.IndexService.Tests` runs the NTFS backend over the system volume;
+    - the SMB crawler test uses `New-SmbShare`.
 
 ## 7. Working rules
 

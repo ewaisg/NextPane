@@ -1,7 +1,7 @@
 # NexPane — Current State
 
 > Updated by every subagent at the end of every session. Newest entry is at the top of the Session Log.
-> Last update: **2026-10-21 (f)** by **Subagent 6 (QA, Verification & Security Inspector)**: re-verification after S1 commit 180b0c0.
+> Last update: **2026-10-22** by **Subagent 2 (Core Systems & Indexing Engine)**: Phase 3 work on branch `phase3-core-search` (see §3, §7). Earlier: 2026-10-21 (f) by S6 (QA).
 > Roster (user-mandated numbering): S1 Architect & State Scribe · S2 Core Systems & Indexing Engine · S3 Native Windows Shell & OS Integration · S4 AI & Semantic Pipeline · S5 UI/UX & Workspace · **S6 QA, Verification & Security Inspector (veto)** · S7 Release & Installer Packaging (incl. icons/assets). Older log entries below that say "S7 QA role" refer to the QA role, which is now **S6**.
 
 ## 1. Snapshot
@@ -38,6 +38,33 @@ C:\Users\Ewais\Projects\NexPane\
 Package pins: Microsoft.Extensions.Hosting.WindowsServices 10.0.13, xunit.v3.mtp-v2 4.0.2, FluentAssertions [7.2.0], BenchmarkDotNet 0.15.8.
 
 ## 3. Just finished
+**2026-10-22, S2 (Core Systems & Indexing Engine): Phase 3 on branch `phase3-core-search` (worktree `.worktrees\phase3`, not merged)**
+
+| Result | Detail |
+|---|---|
+| Items | 27 `[READY_FOR_QA]`: P3.01–P3.09, P3.15–P3.17, P3.19–P3.23, P3.25–P3.33, P3.35. 7 `[IN_PROGRESS]`: P3.10–P3.14 and P3.18 (code done; their `[Elevated]` acceptance tests are written but not run, because this session was not elevated), and P3.24 (p50 budget missed for broad keystrokes). P3.34 (S3), P3.36 (S6) and P3.37 (S1) are not S2's. |
+| Build | `dotnet build NexPane.sln -c Release`: 0 warnings, 0 errors |
+| Tests | Default filter: total 742, failed 0, succeeded 737, skipped 5. The skips are: the symlink test (Developer Mode off), 2 fixture regenerators (opt-in via `NEXPANE_REGENERATE_FIXTURES=1`), and timing gates that skip only when exceeded on battery power. |
+| Scanner | `eng\check-placeholders.ps1`: 89 files, 0 violations, 0 allowlisted, exit 0 |
+| Shared files touched | `Directory.Packages.props` (+Microsoft.Data.Sqlite 10.0.13, DocumentFormat.OpenXml 3.5.1, MimeKit 4.18.2, PdfPig 0.1.16, OpenMcdf 3.3.0); `src/NexPane.Shell/NexPane.Shell.csproj` (now byte-identical to main 4589ad1); `src/NexPane.IndexService/Program.cs` plus new `IndexPipeServer.cs` (the csproj is untouched); `THIRD-PARTY-NOTICES.txt` (+1 OpenMcdf line); `docs/handoff/ARCHITECTURE.md` (§21 rows only); `tests/NexPane.Indexing.Tests/NexPane.Indexing.Tests.csproj` (+Search reference). `NexPane.sln` is not touched. |
+
+Benchmarks (`dotnet run -c Release --project tests/NexPane.Benchmarks -- --filter *`; Ryzen 9 9955HX, 32 threads; **laptop on battery power** for these runs, so the numbers are pessimistic):
+
+| Budget (§17) | Measured (mean) | Verdict |
+|---|---|---|
+| Cold substring 1M: p50 ≤ 5 ms, p95 ≤ 15 ms | 0.81–1.40 ms (`invoice_00`); unit test p95 over 8 queries incl. broad ones is within 2× | met |
+| Incremental refinement 1M: p50 ≤ 1 ms, p95 ≤ 3 ms | 0.65–1.02 ms for a narrow keystroke; broad early keystrokes (80k–170k candidates) are about 2.9 ms p50 in the unit test on AC power | **p50 missed for broad keystrokes** (P3.24 open) |
+| Cold substring 5M: p95 ≤ 60 ms | 8.0 ms | met |
+| Name regex NonBacktracking 1M: p95 ≤ 150 ms | 48.8–55.5 ms (`(a+)+$`) | met |
+| `path:` dir-set 1M: ≤ 50 ms | 27.7–33.6 ms | met |
+| `GetFullPath` × 1M: ≤ 400 ms | 177–201 ms (after the lock-free cache; 796 ms before) | met |
+| Snapshot load 1M: ≤ 2 s | 853–860 ms | met |
+| FTS5 100k documents: p95 ≤ 50 ms | phrase 0.30 ms, frequent term 7.2 ms, prefix 13.5–15.8 ms | met |
+| Index memory ≤ 160 MB / 1M | below 160 MB managed heap (test passes; structural estimate 134 MB) | met |
+| Walker ≥ 50k entries/s warm | about 1.37 M entries/s | met |
+| FS change visible ≤ 1 s (local) | create/rename/move-in/delete each ≤ 1 s (test) | met |
+| USN enumeration ≤ 5 s / $MFT fill ≤ 10 s per 1M | not measured (needs elevation) | open |
+
 
 **2026-10-21 (f), S6 QA: re-verification of S1 commit 180b0c0**
 
@@ -73,7 +100,7 @@ TODO totals: 183 items: 9 VERIFIED_COMPLETE, 5 READY_FOR_QA, the rest PENDING.
 |---|---|---|---|
 | P1.02 uninstall purge mechanism | S1 | `[IN_PROGRESS]` (QA reject) | Replace `ExecAsOriginalUser` (unsupported at uninstall) with a supported mechanism, record in §21, update P4.43/P7.14 acceptance; then S6 re-runs |
 | Phase 2 (branding/assets) | **S7** | `[PENDING]` | Start with P2.01 (logo SVGs), then P2.02 (`tools\NexPane.AssetGen`) |
-| Phase 3 (core FS, indexer, search) | **S2** | `[PENDING]` | Start with P3.01 (VfsPath) and P3.03 (Storage migrations). Can run in parallel with Phase 2 now that `.gitignore` is safe |
+| Phase 3 (core FS, indexer, search) | **S2** | 27 `[READY_FOR_QA]`, 7 `[IN_PROGRESS]` | Branch `phase3-core-search` (worktree `.worktreesphase3`). Open: run the `[Elevated]` tests for P3.10–P3.14 and P3.18; speed up broad keystroke refinement (P3.24 p50). Then S6 runs P3.36 |
 
 ## 5. Active issues / risks
 1. **Deviations from the original plan** (all recorded in ARCHITECTURE §21):
@@ -110,6 +137,20 @@ git check-ignore src/NexPane.Core/Models/VfsEntry.cs src/NexPane.Security/Secret
 ```
 
 ## 7. Session log
+
+### 2026-10-22 — Subagent 2 (Core Systems & Indexing Engine Engineer)
+- Phase 3 on branch `phase3-core-search` (worktree `C:\Users\Ewais\Projects\NexPane\.worktrees\phase3`), 13 commits from `2017395` to the docs commit; not merged into main (the orchestrator merges).
+- Delivered:
+  - VfsPath and the VFS contracts; SQLite storage with migrations and settings.json.
+  - The in-memory index (Core read model + Indexing writer, compaction, snapshot persistence).
+  - The query language (parser, printer, evaluators, planner, parallel executor, live queries), tags, categories and dupe.
+  - The content pipeline (queue, extractors, FTS5).
+  - The local file system provider and RDCW watcher; the parallel walker and source selection.
+  - NTFS parsing (USN, MFT), volume IOCTLs, AccessCheck, the Index Service pipe protocol/server/client and the network crawler.
+  - The benchmarks project.
+- Not run: the `[Elevated]` tests (USN/MFT VHDX, journal reset, service as admin, SMB share). Run them from an elevated terminal with `dotnet test --project tests/NexPane.Indexing.Tests -c Release --filter-trait "Category=Elevated"` (and the same for `tests/NexPane.IndexService.Tests`). Hyper-V is not needed; the tests use diskpart.
+- Incident: early in the session a .NET `[IO.File]` call with a relative path wrote three empty files into the main checkout. They were deleted at once; the orchestrator confirmed main is clean. Rule: use absolute worktree paths only.
+- The machine ran on battery for most measurements. Timing gates in the unit suite assert 2× the budget and skip only when exceeded on battery power.
 
 ### 2026-10-21 (f) — Subagent 6 (QA, Verification & Security Inspector)
 - Re-ran P1.02, P1.07, P1.08, P1.13, P1.14 independently after 180b0c0; verdicts in §3. Checked the roster remap in TODO.md.
