@@ -10,4 +10,11 @@
     <ProjectReference Include="..\NexPane.Storage\NexPane.Storage.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="DocumentFormat.OpenXml" />
+    <PackageReference Include="MimeKit" />
+    <PackageReference Include="OpenMcdf" />
+    <PackageReference Include="PdfPig" />
+  </ItemGroup>
+
 </Project>

@@ -6,6 +6,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NexPane.Indexing\NexPane.Indexing.csproj" />
+    <!-- End-to-end content search checks (P3.32) run the search engine over the real content index. -->
+    <ProjectReference Include="..\..\src\NexPane.Search\NexPane.Search.csproj" />
   </ItemGroup>
 
 </Project>
