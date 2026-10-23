@@ -178,6 +178,12 @@ git check-ignore src/NexPane.Core/Models/VfsEntry.cs src/NexPane.Security/Secret
 - Default suite 756: 0 failed, 3 skipped. Scanner: 98 files, 0 violations. Build: 0 warnings.
 - Needs the user's elevated run (`eng\run-elevated-tests.ps1`): P3.10, P3.11, P3.13, P3.14, P3.38.
 
+### 2026-10-22 (S3-P3.34) — Subagent 3: ShellExecuteEx launch service
+- Branch `p3-shellexec` (worktree `.worktrees\p3-shell`, from `phase3-core-search` @ f852016); code commit 9e65a1e.
+- Added `IShellLauncher` (+ `ShellLaunchRequest`/`ShellLaunchResult`/`ShellLaunchStatus`), `Launch/ShellExecuteLauncher` (PIDL via `SHParseDisplayName`, `ShellExecuteExW` with `SEE_MASK_INVOKEIDLIST|NOASYNC|FLAG_LOG_USAGE|UNICODE`, optional `FLAG_NO_UI`), `Launch/ShellLaunchErrors` (GetLastError / HRESULT / `SE_ERR_*` → typed status), `Threading/ShellStaScheduler` (the §5 Shell STA pool, 2–4 pumping STA threads) and `AddShell(IServiceCollection, IConfiguration)`. Not wired into the UI (Phase 4).
+- Tests: 46 new test cases in `tests/NexPane.Shell.Tests` (`Launch/`, `Threading/`); the integration tests register a unique per-user extension + ProgID with marker-writing verbs (never `.txt`) and delete it in `Dispose`. Shell.Tests 56 total: 55 passed, 1 documented skip (symlinks). Default suite 791: 788 passed, 0 failed, 3 skipped. Build 0 warnings / 0 errors. Scanner 98 files, exit 0.
+- Deviations recorded in ARCHITECTURE §21 (typed result instead of `bool`; `LaunchAsync`; MAX_PATH fallback; DI abstractions packages in Shell).
+
 ### 2026-10-22 (QA-P3) — Subagent 6 (QA)
 - Ran the Phase 3 gate P3.36 in `.worktrees\phase3`; 28 items verified, 6 rejected, P3.38 added; benchmarks and merge forecast in §3. Committed docs to `phase3-core-search` only.
 

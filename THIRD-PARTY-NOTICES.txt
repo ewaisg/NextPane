@@ -21,6 +21,8 @@ Status legend:  [shipped]   included in the current build output
 Microsoft.Extensions.Hosting.WindowsServices       MIT                     https://github.com/dotnet/runtime                                         [shipped]
 Microsoft.Extensions.Hosting                       MIT                     https://github.com/dotnet/runtime                                         [shipped]
 Microsoft.Extensions.DependencyInjection           MIT                     https://github.com/dotnet/runtime                                         [shipped]
+Microsoft.Extensions.DependencyInjection.Abstractions MIT                   https://github.com/dotnet/runtime                                         [shipped]
+Microsoft.Extensions.Configuration.Abstractions    MIT                     https://github.com/dotnet/runtime                                         [shipped]
 Microsoft.Extensions.Logging                       MIT                     https://github.com/dotnet/runtime                                         [shipped]
 Microsoft.Extensions.Options                       MIT                     https://github.com/dotnet/runtime                                         [shipped]
 Microsoft.Extensions.Configuration.Json            MIT                     https://github.com/dotnet/runtime                                         [shipped]
