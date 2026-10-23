@@ -176,6 +176,7 @@ public sealed class LiveQueryHub : IDisposable
         private bool _pendingReset;
         private long _lastEmitTicks;
         private int _disposed;
+        private bool _regexAborted; // a slow-mode regex spent its budget: never evaluated again (§7.2)
 
         public LiveQuery(LiveQueryHub hub, SearchRequest request)
         {
@@ -224,7 +225,7 @@ public sealed class LiveQueryHub : IDisposable
 
         internal void Apply(SearchEngine engine, IReadOnlyList<IndexDeltaBatch> batches, IIndexSnapshot snapshot, CancellationToken ct)
         {
-            if (_disposed != 0 || _predicate is null || _plan is null)
+            if (_disposed != 0 || _predicate is null || _plan is null || _regexAborted)
             {
                 return;
             }
@@ -296,6 +297,11 @@ public sealed class LiveQueryHub : IDisposable
                 _generation = snapshot.Generation;
                 _current = BuildCurrent(snapshot);
             }
+
+            if (_plan.RegexAborted)
+            {
+                AbortRegex(snapshot);
+            }
         }
 
         internal void Flush(TimeProvider clock)
@@ -329,6 +335,11 @@ public sealed class LiveQueryHub : IDisposable
 
         private void Reevaluate(SearchEngine engine, IIndexSnapshot snapshot, bool emitReset, CancellationToken ct)
         {
+            if (_regexAborted)
+            {
+                return; // the pathological pattern is not re-run on later batches or resets
+            }
+
             var watch = Stopwatch.StartNew();
             var plan = engine.Plan(_request with { RefinementOf = null });
             List<EntryRef> items;
@@ -347,6 +358,16 @@ public sealed class LiveQueryHub : IDisposable
             else
             {
                 items = engine.Evaluate(plan, _request with { RefinementOf = null }, snapshot, ct);
+            }
+
+            if (plan.RegexAborted || warnings.Contains(RegexFactory.AbortedMessage)) // the second form: aborted inside ExecuteAsync
+            {
+                _regexAborted = true;
+                items = [];
+                if (!warnings.Contains(RegexFactory.AbortedMessage))
+                {
+                    warnings.Add(RegexFactory.AbortedMessage);
+                }
             }
 
             var predicate = SearchEngine.WithScope(plan.Memory, _request.Scope);
@@ -386,6 +407,26 @@ public sealed class LiveQueryHub : IDisposable
                 _generation = snapshot.Generation;
                 SearchEngine.Sort(items, _request.Sort, snapshot);
                 _current = new SearchResult(items, snapshot.Generation, watch.Elapsed, false, warnings);
+            }
+        }
+
+        /// <summary>The regex budget ran out while applying a delta batch: drop every member and keep the diagnostic.</summary>
+        private void AbortRegex(IIndexSnapshot snapshot)
+        {
+            lock (_gate)
+            {
+                _regexAborted = true;
+                foreach (var e in _members)
+                {
+                    _pendingChanged.Remove(e);
+                    if (!_pendingAdded.Remove(e))
+                    {
+                        _pendingRemoved.Add(e);
+                    }
+                }
+
+                _members = [];
+                _current = new SearchResult([], snapshot.Generation, TimeSpan.Zero, false, [.. _current.Warnings, RegexFactory.AbortedMessage]);
             }
         }
 

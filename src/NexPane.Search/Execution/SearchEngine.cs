@@ -94,6 +94,11 @@ public sealed class SearchEngine : ISearchEngine, IDisposable
         var warnings = new List<string>(plan.Warnings);
         await ResolveLookupsAsync(plan, warnings, ct).ConfigureAwait(false);
         var candidates = EvaluateCore(plan, request, snapshot, out var names, ct);
+        if (plan.RegexAborted)
+        {
+            yield return RegexAbortedResult(snapshot, watch, warnings);
+            yield break;
+        }
 
         if (plan.PostFilters.Count == 0)
         {
@@ -133,6 +138,11 @@ public sealed class SearchEngine : ISearchEngine, IDisposable
                             break;
                         }
 
+                        if (regex.Regex.Aborted)
+                        {
+                            break;
+                        }
+
                         scanned++;
                         if (await ContentMatchesAsync(snapshot, entry, regex.Regex, ct).ConfigureAwait(false))
                         {
@@ -156,7 +166,21 @@ public sealed class SearchEngine : ISearchEngine, IDisposable
             }
         }
 
+        if (plan.RegexAborted)
+        {
+            yield return RegexAbortedResult(snapshot, watch, warnings);
+            yield break;
+        }
+
         yield return Finish(candidates, request, snapshot, watch, warnings);
+    }
+
+    /// <summary>A slow-mode regex spent its per-query budget (§7.2): no partial results, a user-facing diagnostic.</summary>
+    public static SearchResult RegexAbortedResult(IIndexSnapshot snapshot, Stopwatch watch, IEnumerable<string> warnings)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(watch);
+        return new SearchResult([], snapshot.Generation, watch.Elapsed, false, [.. warnings, RegexFactory.AbortedMessage]);
     }
 
     public ILiveQuery Subscribe(SearchRequest request) => _hub.Subscribe(request);

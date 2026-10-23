@@ -51,6 +51,12 @@ public sealed class QueryPlan
 
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
+    /// <summary>Slow-mode (backtracking) regexes of this plan; each carries the per-query time budget.</summary>
+    public IReadOnlyList<UserRegex> SlowRegexes { get; init; } = [];
+
+    /// <summary>True when a slow-mode regex spent its budget: the result must be discarded (<see cref="RegexFactory.AbortedMessage"/>).</summary>
+    public bool RegexAborted => SlowRegexes.Any(r => r.Aborted);
+
     /// <summary>True when the query is a strict refinement of the previous one (evaluate over its result ids only).</summary>
     public bool IsRefinement { get; init; }
 
@@ -116,6 +122,7 @@ public sealed class QueryPlanner(SearchEngineOptions options, TimeProvider clock
             PostFilters = context.PostFilters.OrderBy(PostFilterOrder).ToList(),
             Diagnostics = context.Diagnostics,
             Warnings = context.Warnings.Distinct().ToList(),
+            SlowRegexes = context.SlowRegexes,
             IsRefinement = previous is not null && context.PostFilters.Count == 0 && context.FullText.Count == 0 && context.Semantic.Count == 0 &&
                            IsRefinementOf(previous, expanded),
         };
@@ -385,7 +392,7 @@ public sealed class QueryPlanner(SearchEngineOptions options, TimeProvider clock
 
                     case RegexValue r:
                         return RegexFactory.TryCreate(r.Pattern, r.CaseMode, out var contentRegex, out var contentError)
-                            ? PostFilterOrError(term, conjunctive, context, new ContentRegexFilter(contentRegex!), contentRegex!.SlowMode)
+                            ? PostFilterOrError(term, conjunctive, context, new ContentRegexFilter(contentRegex!), Slow(contentRegex!, context))
                             : Invalid(term, context, contentError!);
                     default:
                         return Invalid(term, context, "content: takes words, a \"phrase\" or a /regex/.");
@@ -457,10 +464,22 @@ public sealed class QueryPlanner(SearchEngineOptions options, TimeProvider clock
             ? WithSlowWarning(new NameRegexPredicate(regex!), regex!, context)
             : Invalid(term, context, error!);
 
+    /// <summary>Registers a slow-mode content regex for the per-query budget; true when the slow-mode warning applies.</summary>
+    private static bool Slow(UserRegex regex, CompileContext context)
+    {
+        if (regex.SlowMode)
+        {
+            context.SlowRegexes.Add(regex);
+        }
+
+        return regex.SlowMode;
+    }
+
     private static Predicate WithSlowWarning(Predicate predicate, UserRegex regex, CompileContext context)
     {
         if (regex.SlowMode)
         {
+            context.SlowRegexes.Add(regex);
             context.Warnings.Add(RegexFactory.SlowModeWarning);
         }
 
@@ -604,6 +623,8 @@ public sealed class QueryPlanner(SearchEngineOptions options, TimeProvider clock
         public List<QueryDiagnostic> Diagnostics { get; } = [];
 
         public List<string> Warnings { get; } = [];
+
+        public List<UserRegex> SlowRegexes { get; } = [];
 
         public void Error(QueryNode node, string message)
         {
