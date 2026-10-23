@@ -7,6 +7,8 @@
   <ItemGroup Label="Hosting">
     <PackageVersion Include="DocumentFormat.OpenXml" Version="3.5.1" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.13" />
     <PackageVersion Include="MimeKit" Version="4.18.2" />
     <PackageVersion Include="OpenMcdf" Version="3.3.0" />
@@ -17,5 +19,7 @@
     <!-- Pinned: FluentAssertions 8+ is commercially licensed (Xceed). Do not upgrade. -->
     <PackageVersion Include="FluentAssertions" Version="[7.2.0]" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
   </ItemGroup>
 </Project>
