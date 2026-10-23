@@ -29,8 +29,9 @@ public static class ShellServiceCollectionExtensions
             : Environment.ProcessorCount / 4;
         threadCount = Math.Clamp(threadCount, ShellStaScheduler.MinThreads, ShellStaScheduler.MaxThreads);
 
-        services.AddSingleton(_ => new ShellStaScheduler(threadCount));
-        services.AddSingleton<IShellLauncher>(provider => new ShellExecuteLauncher(provider.GetRequiredService<ShellStaScheduler>()));
+        // TryAdd: calling AddShell twice must not create a second STA pool or launcher.
+        services.TryAddSingleton(_ => new ShellStaScheduler(threadCount));
+        services.TryAddSingleton<IShellLauncher>(provider => new ShellExecuteLauncher(provider.GetRequiredService<ShellStaScheduler>()));
         return services;
     }
 }

@@ -209,6 +209,17 @@ public sealed class ShellExecuteLauncherTests : IDisposable
         provider.GetRequiredService<ShellStaScheduler>().MaximumConcurrencyLevel.Should().Be(ShellStaScheduler.MaxThreads);
     }
 
+    [Fact]
+    public void AddShell_called_twice_registers_each_service_once()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+        var services = new ServiceCollection().AddShell(configuration).AddShell(configuration);
+
+        services.Count(d => d.ServiceType == typeof(ShellStaScheduler)).Should().Be(1);
+        services.Count(d => d.ServiceType == typeof(IShellLauncher)).Should().Be(1);
+        services.Count(d => d.ServiceType == typeof(NexPane.Core.Vfs.IFileSystemProvider)).Should().Be(1);
+    }
+
     private static ShellLaunchRequest Request(string path, string? verb) =>
         new(path, verb) { Window = ShellLaunchWindow.Hidden, SuppressErrorUi = true };
 
