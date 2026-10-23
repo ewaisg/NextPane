@@ -11,7 +11,7 @@ namespace NexPane.Search.Language;
 /// <para>Quoted strings support <c>\"</c> and <c>\\</c> escapes (any other backslash is literal). Regex literals support
 /// <c>\/</c>. Values of unknown fields (<c>C:\x</c>, <c>foo:bar</c>) are plain text.</para>
 /// </summary>
-public sealed class QueryParser : IQueryParser
+internal sealed class QueryParser : IQueryParser
 {
     public ParseResult Parse(string text)
     {

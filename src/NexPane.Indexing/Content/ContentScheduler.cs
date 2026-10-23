@@ -47,7 +47,7 @@ public sealed class SystemLoadPausePolicy(bool pauseOnBattery = true, int cpuPer
 /// <see cref="IContentExtractor"/>, writes <c>documents</c>/<c>doc_text</c>, retries failures with exponential backoff
 /// (up to 5 attempts) and pauses on demand or by policy (battery, CPU). Workers are dedicated below-normal threads.
 /// </summary>
-public sealed class ContentScheduler : IAsyncDisposable
+internal sealed class ContentScheduler : IAsyncDisposable
 {
     private static readonly ContentWorkKind[] HandledKinds = [ContentWorkKind.Extract];
     private readonly ContentStore _store;

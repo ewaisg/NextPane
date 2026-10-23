@@ -15,7 +15,7 @@ public sealed record WorkItem(long ItemId, ContentWorkKind Kind, long? DocId, st
 /// through the single <see cref="SqliteWriter"/>; reads use pooled WAL reader connections. Implements
 /// <see cref="IContentIndex"/> for search (<c>content:</c> terms, content regex text lookups).
 /// </summary>
-public sealed class ContentStore(SqliteConnectionFactory indexDb, SqliteWriter writer, TimeProvider? clock = null) : IContentIndex
+internal sealed class ContentStore(SqliteConnectionFactory indexDb, SqliteWriter writer, TimeProvider? clock = null) : IContentIndex
 {
     /// <summary>A claimed item is invisible to other workers for this long (crash safety).</summary>
     public static readonly TimeSpan Lease = TimeSpan.FromMinutes(10);

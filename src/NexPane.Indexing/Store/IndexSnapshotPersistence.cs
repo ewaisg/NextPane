@@ -22,7 +22,7 @@ public sealed record PersistedVolume(
 /// written by the database writer thread every 5 s; at startup the snapshot is loaded back so search works before the
 /// volume sources finish their catch-up.
 /// </summary>
-public sealed class IndexSnapshotPersistence : IAsyncDisposable
+internal sealed class IndexSnapshotPersistence : IAsyncDisposable
 {
     public static readonly TimeSpan DefaultInterval = TimeSpan.FromSeconds(5);
 

@@ -26,7 +26,7 @@ public sealed record CrawlResult(long Entries, int DirectoriesListed, int Direct
 /// directory whose modification time is unchanged since the previous crawl is not listed again; its known children are
 /// carried over (sub-directories are still visited). Results are applied as path-addressed deltas and one reconcile.
 /// </summary>
-public sealed class NetworkCrawler : IAsyncDisposable
+internal sealed class NetworkCrawler : IAsyncDisposable
 {
     private readonly IFileSystemProvider _provider;
     private readonly VfsPath _root;

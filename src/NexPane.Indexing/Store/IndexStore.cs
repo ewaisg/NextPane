@@ -25,7 +25,7 @@ public readonly record struct PersistRow(ulong FileId, ulong ParentFileId, strin
 /// publishes a new immutable <see cref="IndexGeneration"/> after every batch and raises <see cref="DeltaApplied"/>.
 /// Readers take <see cref="Current"/> without locks. Compaction runs on the writer thread when tombstones exceed 20 %.
 /// </summary>
-public sealed class IndexStore : IIndexSnapshotSource, IAsyncDisposable
+internal sealed class IndexStore : IIndexSnapshotSource, IAsyncDisposable
 {
     private readonly Channel<Command> _commands;
     private readonly Thread _writer;

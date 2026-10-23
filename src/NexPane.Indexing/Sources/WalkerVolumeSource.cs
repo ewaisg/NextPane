@@ -26,7 +26,7 @@ public sealed record WalkResult(long Entries, long Directories, long Errors, Tim
 /// walker-assigned synthetic ids; catch-up walks over an existing segment emit path-addressed upserts followed by a
 /// reconcile, so unchanged entries keep their ids.
 /// </summary>
-public sealed class WalkerVolumeSource(string rootPath, WalkerOptions? options = null)
+internal sealed class WalkerVolumeSource(string rootPath, WalkerOptions? options = null)
 {
     /// <summary>Walker-assigned ids live in their own range, below the store's synthetic range (2^62).</summary>
     private const ulong WalkerIdBase = 1UL << 61;

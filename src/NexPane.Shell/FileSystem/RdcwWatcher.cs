@@ -255,7 +255,7 @@ public sealed unsafe class RdcwWatcher : IDisposable
 }
 
 /// <summary><see cref="IVfsWatcher"/> over <see cref="RdcwWatcher"/> for open folders (§7.4).</summary>
-public sealed class RdcwVfsWatcher(VfsPath directory, bool recursive) : IVfsWatcher
+internal sealed class RdcwVfsWatcher(VfsPath directory, bool recursive) : IVfsWatcher
 {
     private readonly RdcwWatcher _watcher = new(directory.ToWindowsPath(), recursive);
     private int _started;

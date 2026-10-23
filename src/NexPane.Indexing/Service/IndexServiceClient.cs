@@ -17,7 +17,7 @@ namespace NexPane.Indexing.Service;
 /// the <c>NexPane.IndexService.exe</c> image, so a process that squats the pipe name is rejected.
 /// </summary>
 /// <param name="verifyServer">Overrides the server check (tests that host the server in-process); receives the server's process id.</param>
-public sealed class IndexServiceClient(string pipeName = IndexProtocol.PipeName, TimeSpan? connectTimeout = null, string serviceName = IndexServiceClient.ServiceName,
+internal sealed class IndexServiceClient(string pipeName = IndexProtocol.PipeName, TimeSpan? connectTimeout = null, string serviceName = IndexServiceClient.ServiceName,
     Func<int, bool>? verifyServer = null) : IIndexServiceProbe
 {
     public const string ServiceName = "NexPaneIndex";

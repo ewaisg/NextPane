@@ -9,7 +9,7 @@ namespace NexPane.Indexing.Sources;
 /// turns them into path-addressed index deltas (one store batch per drained burst), re-walks new or moved-in
 /// directories, and on buffer overflow re-walks the whole watched subtree with a reconcile.
 /// </summary>
-public sealed class RdcwChangeSource : IAsyncDisposable
+internal sealed class RdcwChangeSource : IAsyncDisposable
 {
     private readonly IndexStore _store;
     private readonly SegmentHandle _segment;

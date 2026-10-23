@@ -15,7 +15,7 @@ public sealed record JournalPosition(long? JournalId, long? LastUsn);
 /// <c>(journal_id, last_usn)</c> and a full re-enumeration (<see cref="JournalResume"/>), applies the enumeration to the
 /// segment and then follows the journal. A journal reset reported while following triggers a reset and full rescan.
 /// </summary>
-public sealed class UsnVolumeSource(IndexStore store, SegmentHandle segment, VolumeInfoMessage volume)
+internal sealed class UsnVolumeSource(IndexStore store, SegmentHandle segment, VolumeInfoMessage volume)
 {
     /// <summary>Last applied USN (persist it with the journal id for resume).</summary>
     public long LastUsn { get; private set; }

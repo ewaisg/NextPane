@@ -9,7 +9,7 @@ namespace NexPane.Shell.FileSystem;
 /// <c>\\?\</c> long paths, hidden/system filtering, symbolic link and junction kinds with their targets, and an
 /// <see cref="RdcwWatcher"/>-based change watcher.
 /// </summary>
-public sealed class LocalFileSystemProvider : IFileSystemProvider
+internal sealed class LocalFileSystemProvider : IFileSystemProvider
 {
     public string Scheme => VfsPath.FileScheme;
 

@@ -14,7 +14,7 @@ namespace NexPane.Search.Execution;
 /// in parallel partitions (or only the previous result ids for an incremental refinement), applies post-filters
 /// (accessed, content regex streaming scan, dupe) and sorts. Every stage observes the cancellation token.
 /// </summary>
-public sealed class SearchEngine : ISearchEngine, IDisposable
+internal sealed class SearchEngine : ISearchEngine, IDisposable
 {
     private const int RefinementCacheSize = 16;
     private readonly IIndexSnapshotSource _source;

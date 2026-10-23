@@ -9,7 +9,7 @@ namespace NexPane.Search.Language;
 /// only where precedence or nesting requires them, so <c>Parse(Print(ast)) == ast</c>. Unquoted text that would not
 /// re-parse as the same bare token is printed quoted.
 /// </summary>
-public sealed class QueryPrinter : IQueryPrinter
+internal sealed class QueryPrinter : IQueryPrinter
 {
     public string Print(QueryNode ast)
     {
