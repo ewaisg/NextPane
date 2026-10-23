@@ -43,17 +43,19 @@ public sealed unsafe class RdcwWatcher : IDisposable
 {
     public const int DefaultBufferSize = 64 * 1024;
     private const uint NotifyFilter = 0x1 | 0x2 | 0x4 | 0x8 | 0x10 | 0x40;
+    private static long s_liveBuffers;
 
     private readonly Channel<RdcwEvent> _events = Channel.CreateUnbounded<RdcwEvent>(new UnboundedChannelOptions { SingleWriter = true });
     private readonly SafeFileHandle _handle;
     private readonly ThreadPoolBoundHandle _bound;
-    private readonly byte* _buffer;
+    private byte* _buffer;
     private readonly int _bufferSize;
     private readonly bool _recursive;
     private readonly Lock _gate = new();
     private NativeOverlapped* _pending;
     private bool _extended;
     private bool _disposed;
+    private bool _released;
 
     public RdcwWatcher(string directory, bool recursive, int bufferSize = DefaultBufferSize, bool preferExtended = true)
     {
@@ -72,6 +74,7 @@ public sealed unsafe class RdcwWatcher : IDisposable
 
         _bound = ThreadPoolBoundHandle.BindHandle(_handle);
         _buffer = (byte*)NativeMemory.AlignedAlloc((nuint)bufferSize, 8);
+        Interlocked.Increment(ref s_liveBuffers);
     }
 
     public string Directory { get; }
@@ -84,6 +87,10 @@ public sealed unsafe class RdcwWatcher : IDisposable
     /// <summary>Number of overflows observed (diagnostics).</summary>
     public int Overflows { get; private set; }
 
+    /// <summary>Native read buffers currently allocated by all watchers (diagnostics; 0 when every watcher was released
+    /// exactly once).</summary>
+    public static long LiveBuffers => Interlocked.Read(ref s_liveBuffers);
+
     public void Start()
     {
         lock (_gate)
@@ -92,6 +99,12 @@ public sealed unsafe class RdcwWatcher : IDisposable
         }
     }
 
+    /// <summary>
+    /// Ownership handshake (all under <c>_gate</c>): while a read is pending, the I/O completion owns the handle and the
+    /// native buffer, so Dispose only cancels it and the completion callback (which always runs, with
+    /// <c>ERROR_OPERATION_ABORTED</c> or a late result) releases them. With no read pending, Dispose releases them itself.
+    /// <see cref="ReleaseLocked"/> runs at most once.
+    /// </summary>
     public void Dispose()
     {
         lock (_gate)
@@ -104,17 +117,17 @@ public sealed unsafe class RdcwWatcher : IDisposable
             _disposed = true;
             if (_pending != null)
             {
+                // CancelIoEx fails with ERROR_NOT_FOUND when the read already completed; its callback is then queued
+                // and will observe _disposed.
                 Win32FileApi.CancelIoEx(_handle, _pending);
             }
-        }
+            else
+            {
+                ReleaseLocked();
+            }
 
-        // The completion callback (ERROR_OPERATION_ABORTED) frees the overlapped and buffer when a read was pending.
-        if (_pending == null)
-        {
-            Release();
+            _events.Writer.TryComplete(); // under the gate: the completion callback writes events under it too
         }
-
-        _events.Writer.TryComplete();
     }
 
     private void Issue()
@@ -161,7 +174,8 @@ public sealed unsafe class RdcwWatcher : IDisposable
             _bound.FreeNativeOverlapped(overlapped);
             if (_disposed || errorCode == Win32FileApi.ErrorOperationAborted)
             {
-                Release();
+                _events.Writer.TryComplete();
+                ReleaseLocked();
                 return;
             }
 
@@ -173,7 +187,7 @@ public sealed unsafe class RdcwWatcher : IDisposable
             else if (errorCode != 0)
             {
                 _events.Writer.TryComplete(LocalFileSystemProvider.ToException((int)errorCode, Directory));
-                Release();
+                ReleaseLocked();
                 return;
             }
             else
@@ -224,16 +238,19 @@ public sealed unsafe class RdcwWatcher : IDisposable
         }
     }
 
-    private void Release()
+    private void ReleaseLocked()
     {
-        if (_handle.IsClosed)
+        if (_released)
         {
             return;
         }
 
+        _released = true;
         _bound.Dispose();
         _handle.Dispose();
         NativeMemory.AlignedFree(_buffer);
+        _buffer = null;
+        Interlocked.Decrement(ref s_liveBuffers);
     }
 }
 
