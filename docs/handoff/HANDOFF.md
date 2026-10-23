@@ -35,7 +35,7 @@ Phase 2 (S7, branding) and Phase 3 (S2, core systems) can start in parallel now.
 | `.gitignore`, `THIRD-PARTY-NOTICES.txt`, ARCHITECTURE §22 / P1.14 sections | `[VERIFIED_COMPLETE]` (P1.07, P1.13, P1.08, P1.14). `.gitignore` is guarded by `tests/NexPane.Architecture.Tests/GitIgnoreTests.cs` |
 | `ARCHITECTURE.md` §19.3 + §21 (uninstall user-data purge) | `[IN_PROGRESS]` — P1.02 QA reject: `ExecAsOriginalUser` is unsupported at uninstall time |
 | `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss`, `eng/placeholder-allowlist.json` | Cross-references reworded to "task(s) P1.11"; the allowlist is empty; scanner exit 0 |
-| Phase 3 (S2, branch `phase3-core-search`) | `src/NexPane.Core/{Vfs,Indexing,Search}` (VfsPath, VFS contracts, index read model, query AST, search contracts); `src/NexPane.Storage` (SQLite factory, migrations, single writer, settings.json); `src/NexPane.Indexing/{Store,Sources,Content,Ntfs,Service}`; `src/NexPane.Search/{Language,Execution,Live,Tags,Categories}`; `src/NexPane.Shell/{FileSystem,Content,Security}`; `src/NexPane.IndexService/IndexPipeServer.cs`; `tests/NexPane.Benchmarks` (+README); fixtures `tests/TestAssets/{content,usn,mft}`. 32 items `[READY_FOR_QA]` (P3.24 budget met); P3.10 and P3.11 wait for the elevated re-run (`eng\run-elevated-tests.ps1`) |
+| Phase 3 (S2, branch `phase3-core-search`) | `src/NexPane.Core/{Vfs,Indexing,Search}` (VfsPath, VFS contracts, index read model, query AST, search contracts); `src/NexPane.Storage` (SQLite factory, migrations, single writer, settings.json); `src/NexPane.Indexing/{Store,Sources,Content,Ntfs,Service}`; `src/NexPane.Search/{Language,Execution,Live,Tags,Categories}`; `src/NexPane.Shell/{FileSystem,Content,Security}`; `src/NexPane.IndexService/IndexPipeServer.cs`; `tests/NexPane.Benchmarks` (+README); fixtures `tests/TestAssets/{content,usn,mft}`. QA gate P3.36: 28 verified. Since then: P3.16, P3.22, P3.31 and P3.39 (internal implementations, `AddShell`/`AddIndexing`/`AddSearch`) `[READY_FOR_QA]`; P3.10, P3.11, P3.13, P3.14 and P3.38 wait for the elevated run (`eng\run-elevated-tests.ps1`) |
 | Next up | S1: fix P1.02 (purge mechanism) → S6 re-run. In parallel: S7 Phase 2 (P2.01, P2.02), S2 Phase 3 (P3.01, P3.03) |
 
 ## 3. Environment setup
@@ -88,7 +88,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\check-placeholders.ps1
 dotnet test --solution NexPane.sln -c Release --filter-not-trait "Category=Elevated" --filter-not-trait "Category=Live"
 # Elevated suite (from an elevated terminal):
 dotnet test --solution NexPane.sln -c Release --filter-trait "Category=Elevated"
-# Or, for the Phase 3 suites (Indexing + IndexService; VHDX via diskpart, SMB share), with a log for QA in build\elevated-tests.log (UTF-16):
+# Or, for the Phase 3 suites (Indexing + IndexService; VHDX via diskpart, SMB share, a LocalSystem test service via sc create
+# and a non-elevated client via runas /trustlevel), with a log for QA in build\elevated-tests.log (UTF-16, UTC times, measurements).
+# Commit first: the runner refuses a dirty working tree (-AllowDirty logs DIRTY + git status --porcelain).
 powershell -NoProfile -ExecutionPolicy Bypass -File eng\run-elevated-tests.ps1
 # Single project:
 dotnet test --project tests/NexPane.Architecture.Tests -c Release

@@ -125,7 +125,7 @@ TODO totals: 183 items: 9 VERIFIED_COMPLETE, 5 READY_FOR_QA, the rest PENDING.
 |---|---|---|---|
 | P1.02 uninstall purge mechanism | S1 | `[IN_PROGRESS]` (QA reject) | Replace `ExecAsOriginalUser` (unsupported at uninstall) with a supported mechanism, record in §21, update P4.43/P7.14 acceptance; then S6 re-runs |
 | Phase 2 (branding/assets) | **S7** | `[PENDING]` | Start with P2.01 (logo SVGs), then P2.02 (`tools\NexPane.AssetGen`) |
-| Phase 3 (core FS, indexer, search) | **S2** | 32 `[READY_FOR_QA]`, 2 `[IN_PROGRESS]` (P3.10, P3.11: metafile fix awaiting the elevated re-run) | Branch `phase3-core-search` (worktree `.worktrees\phase3`). Next: the user re-runs `eng\run-elevated-tests.ps1`, then S6 runs P3.36 |
+| Phase 3 (core FS, indexer, search) | **S2** | After the QA gate (28 verified): `[READY_FOR_QA]` P3.16, P3.22, P3.31, P3.39. `[IN_PROGRESS]` (code done, awaiting the elevated run) P3.10, P3.11, P3.13, P3.14, P3.38 | Branch `phase3-core-search` (worktree `.worktrees\phase3`), clean tree. Next: the user runs `eng\run-elevated-tests.ps1` (elevated, AC power), then S6 re-verifies |
 
 ## 5. Active issues / risks
 1. **Deviations from the original plan** (all recorded in ARCHITECTURE §21):
@@ -162,6 +162,21 @@ git check-ignore src/NexPane.Core/Models/VfsEntry.cs src/NexPane.Security/Secret
 ```
 
 ## 7. Session log
+
+### 2026-10-23 (e) — Subagent 2: Phase 3 QA rejects and P3.39
+- Commits after the gate `f852016`:
+  - `77b53bf` P3.31: license notices and §15.
+  - `8e09726` P3.16: `RdcwWatcher` ownership handshake; 10k-watcher stress test.
+  - `b884139` P3.22: per-query regex budget; live queries keep the abort.
+  - `cab3609` P3.11 and P3.38: full size/mtime parity, system-volume budget tests; the runner logs UTC and refuses dirty trees.
+  - `0e476c0` P3.14: journal ancestor rule and a bounded, invalidated cache.
+  - `b995326` P3.13: identification-only pipe, SCM server verification, reset error code. Also: the service exe now hosts the pipe server, which it did not before. Elevated test: `sc create` plus a `runas /trustlevel` client.
+  - `eb4f660` P3.39: 7 internal implementations behind Core interfaces, `AddShell`/`AddIndexing`/`AddSearch`.
+- Found and fixed along the way:
+  - `FileReferencePath` never stripped `\?\`.
+  - `RunAsClient` left service threads impersonating at identification level, so `GetFileSecurity` failed with 1346; replaced by `PipeClientToken`.
+- Default suite 756: 0 failed, 3 skipped. Scanner: 98 files, 0 violations. Build: 0 warnings.
+- Needs the user's elevated run (`eng\run-elevated-tests.ps1`): P3.10, P3.11, P3.13, P3.14, P3.38.
 
 ### 2026-10-22 (QA-P3) — Subagent 6 (QA)
 - Ran the Phase 3 gate P3.36 in `.worktrees\phase3`; 28 items verified, 6 rejected, P3.38 added; benchmarks and merge forecast in §3. Committed docs to `phase3-core-search` only.
