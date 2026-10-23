@@ -163,6 +163,11 @@ git check-ignore src/NexPane.Core/Models/VfsEntry.cs src/NexPane.Security/Secret
 
 ## 7. Session log
 
+### 2026-10-23 (f) — Subagent 2: USN enumeration budget (P3.38)
+- The elevated run at `e034ded` passed 9 of 10. It failed only the USN enumeration budget: 8.53 s per 1M against 5 s.
+- `UsnEnumerator` rewritten: V2 records, 4 MB batches, the IOCTL overlapped with in-place parsing, no per-record allocation, and IOCTL/parse times reported separately. Parse + fill measures under 0.1 s per 1M (synthetic).
+- §21: the initial fill reads the raw $MFT (2.48 s per 1M); USN enumeration is the fallback. Default suite 862, 0 failed. Needs another elevated run.
+
 ### 2026-10-23 (e) — Subagent 2: Phase 3 QA rejects and P3.39
 - Commits after the gate `f852016`:
   - `77b53bf` P3.31: license notices and §15.

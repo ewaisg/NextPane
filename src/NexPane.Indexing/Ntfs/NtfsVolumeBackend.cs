@@ -61,7 +61,7 @@ public sealed class NtfsVolumeBackend : IIndexVolumeBackend
         var info = Find(volumeGuid);
         using var volume = NtfsVolume.Open(info.Root);
         volume.TryQueryJournal(out var journal, out _);
-        var all = await Task.Run(() => MftReader.ReadAll(volume, ct), ct).ConfigureAwait(false);
+        var all = await Task.Run(() => ReadEntries(volume, journal.NextUsn, ct), ct).ConfigureAwait(false);
         var mft = NtfsMetafiles.Exclude(all); // $MFT, $LogFile, $Extend subtree ($Quota, $UsnJrnl, ...) are not user files (walker parity)
         _excludedDirectories[volumeGuid] = NtfsMetafiles.ExcludedDirectories(all, mft);
         var filter = new AccessFilter(canList);
@@ -143,6 +143,38 @@ public sealed class NtfsVolumeBackend : IIndexVolumeBackend
             }
         }
         while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Initial fill (§21 2026-10-23): the raw $MFT reader yields names, parent FRNs, sizes and times in one pass
+    /// (2.48 s per 1M records measured). When the $MFT cannot be parsed, <c>FSCTL_ENUM_USN_DATA</c> supplies names and
+    /// hierarchy and each entry is stat-ed by file id.
+    /// </summary>
+    internal static IReadOnlyDictionary<ulong, MftStat> ReadEntries(NtfsVolume volume, long highUsn, CancellationToken ct)
+    {
+        try
+        {
+            return MftReader.ReadAll(volume, ct);
+        }
+        catch (InvalidDataException)
+        {
+            var entries = new Dictionary<ulong, MftStat>();
+            UsnEnumerator.Enumerate(volume, highUsn, (frn, parent, attributes, name) =>
+            {
+                var directory = (attributes & 0x10) != 0;
+                long size = 0, created = 0, modified = 0;
+                if (FileById.TryStat(volume.Handle, frn, out var statAttributes, out var statSize, out var statCreated, out var statModified))
+                {
+                    attributes = statAttributes;
+                    size = directory ? 0 : statSize;
+                    created = statCreated;
+                    modified = statModified;
+                }
+
+                entries[frn] = new MftStat(frn, parent, name.ToString(), attributes, size, created, modified, directory, 0);
+            }, ct);
+            return entries;
+        }
     }
 
     private VolumeInfoMessage Find(string volumeGuid) =>

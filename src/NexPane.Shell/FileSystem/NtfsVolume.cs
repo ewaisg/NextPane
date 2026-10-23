@@ -111,14 +111,14 @@ public sealed class NtfsVolume : IDisposable
 
     /// <summary><c>FSCTL_ENUM_USN_DATA</c> from <paramref name="startFileReference"/>; output starts with the next FRN.
     /// Error <see cref="ErrorHandleEof"/> marks the end of the MFT.</summary>
-    public IoctlResult EnumUsnData(ulong startFileReference, long highUsn, Span<byte> output)
+    public IoctlResult EnumUsnData(ulong startFileReference, long highUsn, Span<byte> output, ushort maxMajorVersion = 3)
     {
         Span<byte> input = stackalloc byte[32];
         BinaryPrimitives.WriteUInt64LittleEndian(input, startFileReference);
         BinaryPrimitives.WriteInt64LittleEndian(input[8..], 0);
         BinaryPrimitives.WriteInt64LittleEndian(input[16..], highUsn);
         BinaryPrimitives.WriteUInt16LittleEndian(input[24..], 2);
-        BinaryPrimitives.WriteUInt16LittleEndian(input[26..], 3);
+        BinaryPrimitives.WriteUInt16LittleEndian(input[26..], maxMajorVersion);
         return Ioctl(FsctlEnumUsnData, input[..28], output);
     }
 

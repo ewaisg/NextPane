@@ -28,21 +28,33 @@ public sealed class ElevatedBudgetTests
         var data = volume.GetVolumeData();
         var mftRecords = data.MftValidDataLength / data.BytesPerFileRecordSegment;
 
-        var watch = Stopwatch.StartNew();
-        long records = 0, directories = 0;
-        foreach (var record in UsnEnumerator.Enumerate(volume, journal.NextUsn, Ct))
+        // Names + hierarchy as an index fill keeps them: FRN → parent map sized up front, names copied into one arena.
+        var parents = new Dictionary<ulong, ulong>((int)Math.Min(mftRecords, int.MaxValue));
+        var arena = new char[64 << 20];
+        var used = 0;
+        long directories = 0;
+        var stats = UsnEnumerator.Enumerate(volume, journal.NextUsn, (frn, parent, attributes, name) =>
         {
-            records++;
-            if (record.IsDirectory)
+            parents[frn] = parent;
+            if (used + name.Length > arena.Length)
+            {
+                Array.Resize(ref arena, arena.Length * 2);
+            }
+
+            name.CopyTo(arena.AsSpan(used));
+            used += name.Length;
+            if ((attributes & 0x10) != 0)
             {
                 directories++;
             }
-        }
+        }, Ct);
 
-        watch.Stop();
-        Gate("USN enumeration (FSCTL_ENUM_USN_DATA, names + hierarchy)", watch.Elapsed, records, budgetPerMillion: TimeSpan.FromSeconds(5),
-            $"{directories:N0} directories; MFT size {mftRecords:N0} records");
+        var records = stats.Records;
+        Gate("USN enumeration (FSCTL_ENUM_USN_DATA, names + hierarchy)", stats.Elapsed, records, budgetPerMillion: TimeSpan.FromSeconds(5),
+            $"{directories:N0} directories; {stats.Batches} batches of up to {UsnEnumerator.BufferSize / (1 << 20)} MB; DeviceIoControl {stats.IoctlTime.TotalSeconds:F2} s, " +
+            $"parse + fill {stats.ParseTime.TotalSeconds:F2} s (overlapped); MFT size {mftRecords:N0} records");
         records.Should().BeGreaterThan(10_000);
+        parents.Count.Should().Be((int)records, "every record has a distinct file reference");
     }
 
     [Fact]
