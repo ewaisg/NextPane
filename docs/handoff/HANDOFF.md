@@ -1,7 +1,7 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-22 (QA-P3) by Subagent 6 (QA): Phase 3 gate P3.36 **not passed** — 28 verified, 6 rejected (P3.11, P3.13, P3.14, P3.16, P3.22, P3.31), P3.38 added. Previously: 2026-10-22 by Subagent 2 (Phase 3 files, gotchas 24–32). This branch's Phase 1/2 text predates main 4589ad1 (Phase 1 complete, Phase 2 merged).
+> Last update: 2026-10-23 (QA-P3b) by Subagent 6 (QA): Phase 3 gate P3.36 **passed** at b2ee822 — all P3 items verified; `phase3-core-search` may merge into main (conflicts: 4 handoff docs + `Directory.Packages.props` + `NexPane.Shell.csproj`, keep both sides; recipe in STATE §3). Previous: 2026-10-22 (QA-P3) by Subagent 6 (QA): Phase 3 gate P3.36 **not passed** — 28 verified, 6 rejected (P3.11, P3.13, P3.14, P3.16, P3.22, P3.31), P3.38 added. Previously: 2026-10-22 by Subagent 2 (Phase 3 files, gotchas 24–32). This branch's Phase 1/2 text predates main 4589ad1 (Phase 1 complete, Phase 2 merged).
 
 ## 1. Executive summary
 
@@ -16,7 +16,7 @@ The build → test → publish → installer pipeline (P1.11) is scripted in `en
 - `[IN_PROGRESS]`: **P1.02** — §19.3/§21 have the uninstaller run `NexPane.exe --purge-user-data` via Inno `ExecAsOriginalUser`, which Inno does not support at uninstall time (Inno help, ExecAsOriginalUser › Remarks). S1 must choose a supported mechanism and update P4.43/P7.14.
 - Phase 1 is therefore not formally complete, but the open defect only affects uninstall design (Phase 4/7).
 
-**Phase 3 QA gate (S6, 2026-10-22): not passed.** Do not merge `phase3-core-search` until these are fixed and re-verified: P3.11 (compare all 10k MFT sizes/mtimes), P3.13 (real `sc create` service + non-elevated client test; client must open the pipe at Identification level and verify the server; dedicated journal-reset error code), P3.14 (elevated NTFS deny-ACL test; subscribe filtering must hide whole denied subtrees and drop cached verdicts on security changes), P3.16 (`RdcwWatcher` dispose/completion race frees the buffer twice), P3.22 (bound total slow-regex time per query/batch), P3.31 (notices: BouncyCastle.Cryptography, shipped status, MPL note; §15 rows), plus P3.38 (elevated USN/$MFT timing; runner UTC timestamps and dirty-tree guard). Code merges with main cleanly; only the four handoff docs conflict.
+**Phase 3 QA gate (S6, 2026-10-23): PASSED** at b2ee822 (the 2026-10-22 rejections P3.11, P3.13, P3.14, P3.16, P3.22, P3.31 are fixed and verified, as are P3.34, P3.37, P3.38, P3.39). Merge `phase3-core-search` into main following STATE §3, then re-run `eng\build.ps1`.
 
 Phase 2 (S7, branding) and Phase 3 (S2, core systems) can start in parallel now.
 

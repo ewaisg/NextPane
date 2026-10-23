@@ -1,14 +1,14 @@
 # NexPane — Current State
 
 > Updated by every subagent at the end of every session. Newest entry is at the top of the Session Log.
-> Last update: **2026-10-22 (QA-P3)** by **Subagent 6 (QA, Verification & Security Inspector)**: Phase 3 gate P3.36 on branch `phase3-core-search` @ 25da0df — **not passed** (28 verified, 6 rejected, see §3). Earlier: 2026-10-22 by S2. Note: this branch's Phase 1/2 lines predate main `4589ad1` (Phase 1 complete 14/14, Phase 2 merged); take main's text for those when merging.
+> Last update: **2026-10-23 (QA-P3b)** by **Subagent 6 (QA, Verification & Security Inspector)**: Phase 3 gate P3.36 **PASSED** on `phase3-core-search` @ b2ee822 — all P3.01–P3.39 `[VERIFIED_COMPLETE]`; branch may merge into main (see §3 for the merge recipe). Previous: 2026-10-22 (QA-P3) by Subagent 6 (QA): Phase 3 gate P3.36 on branch `phase3-core-search` @ 25da0df — **not passed** (28 verified, 6 rejected, see §3). Earlier: 2026-10-22 by S2. Note: this branch's Phase 1/2 lines predate main `4589ad1` (Phase 1 complete 14/14, Phase 2 merged); take main's text for those when merging.
 > Roster (user-mandated numbering): S1 Architect & State Scribe · S2 Core Systems & Indexing Engine · S3 Native Windows Shell & OS Integration · S4 AI & Semantic Pipeline · S5 UI/UX & Workspace · **S6 QA, Verification & Security Inspector (veto)** · S7 Release & Installer Packaging (incl. icons/assets). Older log entries below that say "S7 QA role" refer to the QA role, which is now **S6**.
 
 ## 1. Snapshot
 
 | Item | Value |
 |---|---|
-| **Phase 3 gate (P3.36)** | **NOT passed (S6, 2026-10-22).** 28 of 34 S2 items `[VERIFIED_COMPLETE]`; **rejected → `[IN_PROGRESS]`: P3.11, P3.13, P3.14, P3.16, P3.22, P3.31**; P3.34 (S3) and P3.37 (S1) `[PENDING]`; new P3.38 (S2). Do not merge `phase3-core-search` into `main` until the rejects are fixed and re-verified |
+| **Phase 3 gate (P3.36)** | **PASSED (S6, 2026-10-23, HEAD b2ee822).** All 39 Phase 3 items `[VERIFIED_COMPLETE]`; build 0/0, 859/862 tests (3 documented skips), elevated suite 9/9 user-run. Ready to merge into `main` |
 | Current phase | **Phase 1 — NOT complete: 13/14 `[VERIFIED_COMPLETE]`.** P1.02 rejected again → `[IN_PROGRESS]` (S1): the uninstall-time purge in §19.3/§21 relies on Inno `ExecAsOriginalUser`, which Inno does not support at uninstall time. Phase 2 (S7) and Phase 3 (S2) may start now |
 | Placeholder scanner (P1.12) | `eng\check-placeholders.ps1` → **26 files, 0 violations, 0 allowlisted, 0 stale, exit 0**. The four `TODO P1.11` cross-references now read "task(s) P1.11"; `eng\placeholder-allowlist.json` has `"entries": []` |
 | Toolchain | .NET SDK 10.0.402, Git 2.55.0, Inno Setup 6.7.3 (per-user: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) |
@@ -39,6 +39,15 @@ C:\Users\Ewais\Projects\NexPane\
 Package pins: Microsoft.Extensions.Hosting.WindowsServices 10.0.13, xunit.v3.mtp-v2 4.0.2, FluentAssertions [7.2.0], BenchmarkDotNet 0.15.8.
 
 ## 3. Just finished
+
+**2026-10-23 (QA-P3b), S6: Phase 3 gate re-run — PASSED**
+- Re-verified the 6 rejected items, P3.34, P3.37, P3.38 and P3.39 in `.worktrees\phase3` at b2ee822 (power: AC). Evidence per item in TODO.md.
+- `eng\build.ps1` exit 0: 0 warnings, 0 errors, 862 tests, 859 passed, 3 documented skips. `eng\check-placeholders.ps1` 103 files, 0 violations. Planted WPF/FrameworkReference/public-implementation violations → 4 architecture-test failures, reverted, 147/147.
+- Elevated evidence: user-run `build\elevated-tests.log` + `build\elevated-metrics.txt` for b2ee822 (clean tree, UTC, AC): 9 passed, 1 by-design skip. Test code reviewed against each acceptance (full 10k parity, deny-ACL subtree hidden initially and live, `sc create` service + `runas /trustlevel:0x20000` client, budgets with record counts). No leftover test service, SMB share, VHDX, volume, registry key or temp tree after the runs.
+- Benchmarks (AC, means): cold 1M 0.99 ms; 5M 6.18 ms; incremental refinement 0.048 ms; broad next keystroke medians 0.13–0.61 ms (worst mean 0.82 ms, p95 ≈ 1.8 ms; budget p50 1 / p95 3 ms); regex ReDoS 45.5 ms; `path:` 30.8 ms; `GetFullPath` 1M 166 ms; snapshot 1M 856 ms; FTS 0.35 / 8.5 / 13.0 ms; USN 1.25 s/1M; $MFT 2.26 s/1M.
+- **Merge recipe (main 4589ad1):** `git merge-tree` reports conflicts in `docs/handoff/ARCHITECTURE.md`, `HANDOFF.md`, `STATE.md`, `TODO.md`, `Directory.Packages.props` and `src/NexPane.Shell/NexPane.Shell.csproj`. Resolve the two code files by keeping both sides (main: System.Drawing.Common + FlaUI.UIA3 pins; branch: Microsoft.Extensions.Configuration/DependencyInjection + NetArchTest.Rules pins and `InternalsVisibleTo NexPane.Indexing.Tests`). Docs: main's Phase 1/2 text, this branch's Phase 3 text, both sides' §21 rows. QA built such a resolution in a throwaway worktree: 0/0, 936/939 tests, placeholder scan clean. Re-run `eng\build.ps1` after the real merge.
+- Advisories (no gate impact): `AddShell` mixes `TryAddSingleton`/`AddSingleton`; the Index Service takes `pipe` from any configuration source (prefer command line only).
+
 
 **2026-10-22 (QA-P3), S6: Phase 3 gate P3.36 — NOT passed**
 - Worked in `.worktrees\phase3` only (absolute paths); scratch output in the S6 scratchpad. Power: **AC** (Win32_Battery status 2, 99 %). CPU: AMD Ryzen 9 9955HX, 16C/32T.
@@ -162,6 +171,9 @@ git check-ignore src/NexPane.Core/Models/VfsEntry.cs src/NexPane.Security/Secret
 ```
 
 ## 7. Session log
+
+### 2026-10-23 (QA-P3b) — Subagent 6 (QA)
+- Phase 3 gate re-run at b2ee822: every P3 item verified, P3.36 `[VERIFIED_COMPLETE]`; merge recipe in §3. Committed docs to `phase3-core-search` only.
 
 ### 2026-10-23 (f) — Subagent 2: USN enumeration budget (P3.38)
 - The elevated run at `e034ded` passed 9 of 10. It failed only the USN enumeration budget: 8.53 s per 1M against 5 s.
