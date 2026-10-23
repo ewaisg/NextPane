@@ -73,16 +73,28 @@ public sealed class ElevatedVolumeTests : IAsyncLifetime
             .Select(p => $"{p.Key} (indexed {(p.Value ? "directory" : "file")})").ToList();
         Assert.True(kindMismatches.Count == 0, $"{kindMismatches.Count} entr(ies) with the wrong directory flag: {string.Join(", ", kindMismatches.Take(20))}");
 
-        // Sizes from the raw $MFT equal GetFileInformationByHandleEx (FileInfo) values.
-        for (var i = 1; i < snapshot.Count(segment.Id); i += 97)
+        // Size and mtime from the raw $MFT equal the file system's values (FileInfo) for every one of the 10,000 files.
+        var compared = 0;
+        var mismatches = new List<string>();
+        for (var i = 1; i < snapshot.Count(segment.Id); i++)
         {
-            if (!seg.IsDeleted(i) && !seg.IsDirectory(i))
+            if (seg.IsDeleted(i) || seg.IsDirectory(i))
             {
-                var info = new FileInfo(seg.GetFullPath(i));
-                seg.GetSize(i).Should().Be(info.Length);
-                seg.GetModified(i).Should().Be(info.LastWriteTimeUtc.ToFileTimeUtc());
+                continue;
+            }
+
+            var path = seg.GetFullPath(i);
+            var info = new FileInfo(path);
+            compared++;
+            if (seg.GetSize(i) != info.Length || seg.GetModified(i) != info.LastWriteTimeUtc.ToFileTimeUtc())
+            {
+                mismatches.Add($"{path}: indexed {seg.GetSize(i)} B @ {seg.GetModified(i)}, file {info.Length} B @ {info.LastWriteTimeUtc.ToFileTimeUtc()}");
             }
         }
+
+        ElevatedMetrics.Write($"VHDX enumeration: size+mtime compared for {compared:N0} files, {mismatches.Count} mismatch(es)");
+        Assert.True(mismatches.Count == 0, $"{mismatches.Count} size/mtime mismatch(es): {string.Join("; ", mismatches.Take(20))}");
+        compared.Should().BeGreaterThanOrEqualTo(10_000, "all generated files are compared");
 
         var watch = Stopwatch.StartNew();
         File.Move(Path.Combine(root, "d00", "f00000.bin"), Path.Combine(root, "d01", "renamed.bin"));
