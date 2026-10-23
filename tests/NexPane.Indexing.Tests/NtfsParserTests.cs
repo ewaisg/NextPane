@@ -1,6 +1,8 @@
 using System.Buffers.Binary;
 using System.Text;
+using NexPane.Core.Indexing;
 using NexPane.Indexing.Ntfs;
+using NexPane.Indexing.Store;
 
 namespace NexPane.Indexing.Tests;
 
@@ -37,6 +39,9 @@ public sealed class NtfsParserTests
             nonResidentData: (5_000_000_123, [0x21, 0x40, 0x00, 0x10, 0x11, 0x10, 0x30, 0x01, 0x01, 0x00])));
         File.WriteAllBytes(Path.Combine(AssetDir("mft"), "attrlist.bin"), MftRecord(102, 1, directory: true, names: [(5, "Many Links", 1)],
             attributeList: [(0x30u, 102UL | (1UL << 48)), (0x80u, 2047UL | (4UL << 48))]));
+        // As NTFS writes it: no FILE_ATTRIBUTE_DIRECTORY in $STANDARD_INFORMATION (hidden|system), 0x10000000 in $FILE_NAME.
+        File.WriteAllBytes(Path.Combine(AssetDir("mft"), "directory.bin"), MftRecord(36, 1, directory: true, names: [(0x0005000000000005, "System Volume Information", 3)],
+            standardAttributes: 0x06, fileNameFlags: 0x10000006));
     }
 
     [Fact]
@@ -189,6 +194,51 @@ public sealed class NtfsParserTests
     }
 
     [Fact]
+    public async Task Directory_without_the_directory_attribute_in_standard_information_is_indexed_as_a_directory()
+    {
+        // Regression (elevated run, "M:\System Volume Information" indexed as a file): NTFS marks directories in the
+        // record header (0x0002) and $FILE_NAME (0x10000000), never with FILE_ATTRIBUTE_DIRECTORY in $STANDARD_INFORMATION.
+        var bytes = Asset("mft", "directory.bin");
+        MftRecordParser.TryParse(bytes, Sector, 36, out var record, out var error).Should().BeTrue(error);
+        record!.IsDirectory.Should().BeTrue();
+        record.StandardAttributes.Should().Be(0x06u, "the fixture mirrors what NTFS stores");
+        record.PrimaryName!.Attributes.Should().Be(0x10000006u);
+
+        var stat = MftReader.ToStat(record);
+        var file = MftReader.ToStat(Parse("resident.bin", 100));
+
+        stat.Attributes.Should().Be(0x16u, "hidden | system | directory, without the NTFS-internal index bit");
+        stat.IsDirectory.Should().BeTrue();
+        stat.Size.Should().Be(0);
+        file.Attributes.Should().Be(0x20u);
+        file.IsDirectory.Should().BeFalse();
+
+        const ulong root = 0x0005000000000005;
+        var ct = TestContext.Current.CancellationToken;
+        await using var store = new IndexStore();
+        var segment = await store.RegisterVolumeAsync(new IndexVolumeInfo(@"M:\", VolumeKind.NtfsFixed), root, ct);
+        var child = file with { ParentReference = stat.FileReference };
+        await store.SubmitAsync(segment.Id, [.. new[] { stat, child }.Select(e =>
+            IndexDelta.UpsertById(e.FileReference, e.ParentReference, e.Name!, e.Attributes, e.Size, e.ModifiedUtc, e.CreatedUtc))], ct);
+        await store.FlushAsync(ct);
+
+        var snapshot = store.CurrentGeneration;
+        var seg = snapshot.GetSegment(segment.Id);
+        var entries = Enumerable.Range(1, snapshot.Count(segment.Id) - 1).ToDictionary(seg.GetFullPath, seg.IsDirectory);
+        entries.Should().Equal(new Dictionary<string, bool>
+        {
+            [@"M:\System Volume Information"] = true,
+            [@"M:\System Volume Information\readme.txt"] = false,
+        });
+    }
+
+    private static MftFileRecord Parse(string fixture, ulong recordNumber)
+    {
+        MftRecordParser.TryParse(Asset("mft", fixture), Sector, recordNumber, out var record, out var error).Should().BeTrue(error);
+        return record!;
+    }
+
+    [Fact]
     public void Torn_writes_and_bad_signatures_are_rejected()
     {
         var torn = Asset("mft", "resident.bin");
@@ -310,7 +360,8 @@ public sealed class NtfsParserTests
     }
 
     private static byte[] MftRecord(ulong recordNumber, ushort sequence, bool directory, (ulong Parent, string Name, byte Namespace)[] names,
-        byte[]? residentData = null, (long Size, byte[] Runs)? nonResidentData = null, (uint Type, ulong Segment)[]? attributeList = null)
+        byte[]? residentData = null, (long Size, byte[] Runs)? nonResidentData = null, (uint Type, ulong Segment)[]? attributeList = null,
+        uint? standardAttributes = null, uint fileNameFlags = 0)
     {
         var r = new byte[RecordSize];
         "FILE"u8.CopyTo(r);
@@ -330,7 +381,7 @@ public sealed class NtfsParserTests
         var si = new byte[72];
         BinaryPrimitives.WriteInt64LittleEndian(si, Times.Created);
         BinaryPrimitives.WriteInt64LittleEndian(si.AsSpan(8), Times.Modified);
-        BinaryPrimitives.WriteUInt32LittleEndian(si.AsSpan(32), directory ? 0x10u : 0x20u);
+        BinaryPrimitives.WriteUInt32LittleEndian(si.AsSpan(32), standardAttributes ?? (directory ? 0x10u : 0x20u));
         BinaryPrimitives.WriteUInt32LittleEndian(si.AsSpan(52), 0x105);
         at = Resident(r, at, MftRecordParser.StandardInformation, si);
         if (attributeList is not null)
@@ -354,6 +405,7 @@ public sealed class NtfsParserTests
             BinaryPrimitives.WriteUInt64LittleEndian(fn, parent);
             BinaryPrimitives.WriteInt64LittleEndian(fn.AsSpan(8), Times.Created);
             BinaryPrimitives.WriteInt64LittleEndian(fn.AsSpan(16), Times.Modified);
+            BinaryPrimitives.WriteUInt32LittleEndian(fn.AsSpan(56), fileNameFlags);
             fn[64] = (byte)name.Length;
             fn[65] = ns;
             nameBytes.CopyTo(fn, 66);

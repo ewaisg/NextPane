@@ -14,6 +14,8 @@ public readonly record struct MftStat(ulong FileReference, ulong ParentReference
 public static class MftReader
 {
     private const int BlockSize = 1 << 20;
+    private const uint DirectoryAttribute = 0x10;
+    private const uint FileNameIndexPresent = 0x10000000;
 
     public static IReadOnlyDictionary<ulong, MftStat> ReadAll(NtfsVolume volume, CancellationToken ct)
     {
@@ -66,10 +68,7 @@ public static class MftReader
                             continue;
                         }
 
-                        var name = record.PrimaryName;
-                        result[record.FileReference] = new MftStat(record.FileReference, name?.ParentReference ?? 0, name?.Name,
-                            record.StandardAttributes ?? 0, record.IsDirectory ? 0 : record.DataSize ?? -1, record.CreatedUtc ?? 0, record.ModifiedUtc ?? 0,
-                            record.IsDirectory, record.SecurityId ?? 0);
+                        result[record.FileReference] = ToStat(record);
                     }
                 }
             }
@@ -89,5 +88,26 @@ public static class MftReader
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Converts a parsed base record to the Win32 view the index expects. <c>$STANDARD_INFORMATION</c> file attributes
+    /// never carry <c>FILE_ATTRIBUTE_DIRECTORY</c> on NTFS (directories are marked by the record header flag 0x0002,
+    /// mirrored as 0x10000000 "index present" in <c>$FILE_NAME</c>), so the directory bit is set from the header and the
+    /// NTFS-internal index bit is cleared.
+    /// </summary>
+    public static MftStat ToStat(MftFileRecord record)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        var name = record.PrimaryName;
+        var attributes = record.StandardAttributes ?? name?.Attributes ?? 0;
+        attributes &= ~(FileNameIndexPresent | DirectoryAttribute);
+        if (record.IsDirectory)
+        {
+            attributes |= DirectoryAttribute;
+        }
+
+        return new MftStat(record.FileReference, name?.ParentReference ?? 0, name?.Name, attributes,
+            record.IsDirectory ? 0 : record.DataSize ?? -1, record.CreatedUtc ?? 0, record.ModifiedUtc ?? 0, record.IsDirectory, record.SecurityId ?? 0);
     }
 }

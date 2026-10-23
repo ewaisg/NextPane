@@ -53,15 +53,25 @@ public sealed class ElevatedVolumeTests : IAsyncLifetime
         // Parity with a directory enumeration (what the walker sees): no $MFT/$Extend metafiles, nothing the user cannot list.
         var snapshot = store.CurrentGeneration;
         var seg = snapshot.GetSegment(segment.Id);
-        var indexed = Enumerable.Range(1, snapshot.Count(segment.Id) - 1).Where(i => !seg.IsDeleted(i)).Select(seg.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var enumerated = Directory.EnumerateFileSystemEntries(root, "*", new EnumerationOptions
+        var indexedDirectory = Enumerable.Range(1, snapshot.Count(segment.Id) - 1).Where(i => !seg.IsDeleted(i))
+            .ToDictionary(seg.GetFullPath, seg.IsDirectory, StringComparer.OrdinalIgnoreCase);
+        var enumeratedDirectory = new DirectoryInfo(root).EnumerateFileSystemInfos("*", new EnumerationOptions
         {
             RecurseSubdirectories = true,
             AttributesToSkip = 0,
             IgnoreInaccessible = true,
-        }).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        indexed.Should().NotContain(p => Path.GetFileName(p).StartsWith('$') && !enumerated.Contains(p));
-        indexed.Should().BeEquivalentTo(enumerated);
+        }).ToDictionary(i => i.FullName, i => (i.Attributes & FileAttributes.Directory) != 0, StringComparer.OrdinalIgnoreCase);
+
+        // Set differences (cheap at 10k entries; BeEquivalentTo on large sets is quadratic), first 20 shown.
+        var onlyIndexed = indexedDirectory.Keys.Except(enumeratedDirectory.Keys, StringComparer.OrdinalIgnoreCase).ToList();
+        var onlyEnumerated = enumeratedDirectory.Keys.Except(indexedDirectory.Keys, StringComparer.OrdinalIgnoreCase).ToList();
+        Assert.True(onlyIndexed.Count == 0, $"{onlyIndexed.Count} indexed path(s) not in the directory enumeration: {string.Join(", ", onlyIndexed.Take(20))}");
+        Assert.True(onlyEnumerated.Count == 0, $"{onlyEnumerated.Count} enumerated path(s) missing from the index: {string.Join(", ", onlyEnumerated.Take(20))}");
+
+        // Directory/file classification of every entry matches the filesystem.
+        var kindMismatches = indexedDirectory.Where(p => p.Value != enumeratedDirectory[p.Key])
+            .Select(p => $"{p.Key} (indexed {(p.Value ? "directory" : "file")})").ToList();
+        Assert.True(kindMismatches.Count == 0, $"{kindMismatches.Count} entr(ies) with the wrong directory flag: {string.Join(", ", kindMismatches.Take(20))}");
 
         // Sizes from the raw $MFT equal GetFileInformationByHandleEx (FileInfo) values.
         for (var i = 1; i < snapshot.Count(segment.Id); i += 97)
