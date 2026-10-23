@@ -1,13 +1,14 @@
 # NexPane — Current State
 
 > Updated by every subagent at the end of every session. Newest entry is at the top of the Session Log.
-> Last update: **2026-10-22** by **Subagent 2 (Core Systems & Indexing Engine)**: Phase 3 work on branch `phase3-core-search` (see §3, §7). Earlier: 2026-10-21 (f) by S6 (QA).
+> Last update: **2026-10-22 (QA-P3)** by **Subagent 6 (QA, Verification & Security Inspector)**: Phase 3 gate P3.36 on branch `phase3-core-search` @ 25da0df — **not passed** (28 verified, 6 rejected, see §3). Earlier: 2026-10-22 by S2. Note: this branch's Phase 1/2 lines predate main `4589ad1` (Phase 1 complete 14/14, Phase 2 merged); take main's text for those when merging.
 > Roster (user-mandated numbering): S1 Architect & State Scribe · S2 Core Systems & Indexing Engine · S3 Native Windows Shell & OS Integration · S4 AI & Semantic Pipeline · S5 UI/UX & Workspace · **S6 QA, Verification & Security Inspector (veto)** · S7 Release & Installer Packaging (incl. icons/assets). Older log entries below that say "S7 QA role" refer to the QA role, which is now **S6**.
 
 ## 1. Snapshot
 
 | Item | Value |
 |---|---|
+| **Phase 3 gate (P3.36)** | **NOT passed (S6, 2026-10-22).** 28 of 34 S2 items `[VERIFIED_COMPLETE]`; **rejected → `[IN_PROGRESS]`: P3.11, P3.13, P3.14, P3.16, P3.22, P3.31**; P3.34 (S3) and P3.37 (S1) `[PENDING]`; new P3.38 (S2). Do not merge `phase3-core-search` into `main` until the rejects are fixed and re-verified |
 | Current phase | **Phase 1 — NOT complete: 13/14 `[VERIFIED_COMPLETE]`.** P1.02 rejected again → `[IN_PROGRESS]` (S1): the uninstall-time purge in §19.3/§21 relies on Inno `ExecAsOriginalUser`, which Inno does not support at uninstall time. Phase 2 (S7) and Phase 3 (S2) may start now |
 | Placeholder scanner (P1.12) | `eng\check-placeholders.ps1` → **26 files, 0 violations, 0 allowlisted, 0 stale, exit 0**. The four `TODO P1.11` cross-references now read "task(s) P1.11"; `eng\placeholder-allowlist.json` has `"entries": []` |
 | Toolchain | .NET SDK 10.0.402, Git 2.55.0, Inno Setup 6.7.3 (per-user: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) |
@@ -38,6 +39,30 @@ C:\Users\Ewais\Projects\NexPane\
 Package pins: Microsoft.Extensions.Hosting.WindowsServices 10.0.13, xunit.v3.mtp-v2 4.0.2, FluentAssertions [7.2.0], BenchmarkDotNet 0.15.8.
 
 ## 3. Just finished
+
+**2026-10-22 (QA-P3), S6: Phase 3 gate P3.36 — NOT passed**
+- Worked in `.worktrees\phase3` only (absolute paths); scratch output in the S6 scratchpad. Power: **AC** (Win32_Battery status 2, 99 %). CPU: AMD Ryzen 9 9955HX, 16C/32T.
+- Independent runs: `eng\build.ps1` exit 0 — **0 warnings, 0 errors; 745 tests, 742 passed, 3 skipped** (2 opt-in fixture regenerators, 1 symlink test without Developer Mode); all battery-conditional timing gates ran and passed. `eng\check-placeholders.ps1` exit 0 (92 files, 0 violations, 0 allowlisted). Migration SQL identical to ARCHITECTURE §9.
+- Elevated evidence: user-run `build\elevated-tests.log` names commit 25da0df = HEAD (tree clean now), AC power, build 0/0, 5/5 `Category=Elevated` tests passed. Runner caveats → P3.38: the log's "Z" times are local time (`ToString('u')` without `ToUniversalTime()`), and the runner does not record or refuse a dirty working tree.
+- **Benchmarks** (BenchmarkDotNet `--filter *`, AC power, means):
+
+| Benchmark | Measured | Budget (§17) |
+|---|---|---|
+| Cold literal substring, 1M | 1.05 ms (σ 0.03) | p50 ≤ 5 / p95 ≤ 15 ms |
+| Incremental refinement, 1M | 0.048 ms | p50 ≤ 1 / p95 ≤ 3 ms |
+| Broad refinement worst (`re`→`rep`), 1M | mean 0.69, median 0.55, σ 0.27 ms (p95 ≈ 1.1) | p50 ≤ 1 / p95 ≤ 3 ms |
+| Regex `(a+)+$` NonBacktracking, 1M | 43.6 ms | p95 ≤ 150 ms |
+| `path:` directory set, 1M | 27.2 ms | ≤ 50 ms |
+| Cold literal substring, 5M | 5.94 ms | p95 ≤ 60 ms |
+| `GetFullPath` × 1M | 148.2 ms | ≤ 400 ms |
+| Snapshot load, 1M | 800 ms | ≤ 2 s |
+| FTS5 100k docs (phrase / term / prefix) | 0.29 / 6.4 / 12.3 ms | p95 ≤ 50 ms |
+| USN enumeration, raw $MFT fill per 1M | **not measured** | ≤ 5 s / ≤ 10 s → P3.38 |
+
+- **Rejections (details in TODO.md):** P3.11 size/mtime parity samples 1/97 of the 10k files; P3.13 no `sc create` + non-elevated client test (QA decision: testable on the dev machine, not deferred to Phase 7), client pipe opened at default SecurityImpersonation without server verification (pipe-squatting impersonation when the service is absent), journal reset detected by message substring; P3.14 no elevated NTFS deny-ACL test, `SubscribeAsync` checks only the direct parent (changes under descendants of a denied folder leak), verdict cache never invalidated on security changes; P3.16 `RdcwWatcher.Dispose` can double-free the native buffer; P3.22 slow-mode regex has a per-match timeout but no per-query/batch budget; P3.31 THIRD-PARTY-NOTICES lacks BouncyCastle.Cryptography and still marks shipped packages `[planned]`, §15 still lists MsgReader/UglyToad.PdfPig.
+- Other review results (no defect): FTS5 queries quote every token and bind parameters (no FTS/SQL injection); the only interpolated SQL is an enum list and `PRAGMA user_version`; no PowerShell/process launches in `src` (share names only in tests); lock-free index readers reviewed (publication ordering, append-only arenas, epoch-based path cache) and found sound; sync-over-async only on dedicated writer/worker threads; `SettingsStore.Open` writes synchronously (call it off the UI thread).
+- **Merge forecast vs main 4589ad1:** `git merge-tree` → only `docs/handoff/ARCHITECTURE.md`, `HANDOFF.md`, `STATE.md`, `TODO.md` conflict; `Directory.Packages.props`, `THIRD-PARTY-NOTICES.txt`, the solution and all code auto-merge. A throwaway merged worktree (docs resolved arbitrarily, never committed, then removed) built with 0 warnings / 0 errors and passed 819 of 822 tests (same 3 skips), placeholder scan clean (102 files). Resolve the doc conflicts by keeping main's Phase 1/2 text and this branch's Phase 3 text, and append both sides' §21 rows.
+
 **2026-10-22, S2 (Core Systems & Indexing Engine): Phase 3 on branch `phase3-core-search` (worktree `.worktrees\phase3`, not merged)**
 
 | Result | Detail |
@@ -137,6 +162,9 @@ git check-ignore src/NexPane.Core/Models/VfsEntry.cs src/NexPane.Security/Secret
 ```
 
 ## 7. Session log
+
+### 2026-10-22 (QA-P3) — Subagent 6 (QA)
+- Ran the Phase 3 gate P3.36 in `.worktrees\phase3`; 28 items verified, 6 rejected, P3.38 added; benchmarks and merge forecast in §3. Committed docs to `phase3-core-search` only.
 
 ### 2026-10-22 (d) — Subagent 2: MFT directory classification fix
 - The elevated re-run at `762b552` (AC) passed the metafile parity check. It found another product bug: `M:\System Volume Information` was indexed as a file (FileNotFoundException in the size loop).

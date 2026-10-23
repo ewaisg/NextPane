@@ -1,7 +1,7 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-22 by Subagent 2 (Core Systems & Indexing): Phase 3 files, gotchas 24–32 (branch `phase3-core-search`). Previously: 2026-10-21 (f) by Subagent 6 (QA): re-verification after S1 commit 180b0c0 — 13/14 Phase 1 items verified; P1.02 rejected (uninstall purge mechanism).
+> Last update: 2026-10-22 (QA-P3) by Subagent 6 (QA): Phase 3 gate P3.36 **not passed** — 28 verified, 6 rejected (P3.11, P3.13, P3.14, P3.16, P3.22, P3.31), P3.38 added. Previously: 2026-10-22 by Subagent 2 (Phase 3 files, gotchas 24–32). This branch's Phase 1/2 text predates main 4589ad1 (Phase 1 complete, Phase 2 merged).
 
 ## 1. Executive summary
 
@@ -15,6 +15,8 @@ The build → test → publish → installer pipeline (P1.11) is scripted in `en
 - `[VERIFIED_COMPLETE]` (S6, 2026-10-21): P1.01, P1.03–P1.14 except P1.02 — 13 of 14.
 - `[IN_PROGRESS]`: **P1.02** — §19.3/§21 have the uninstaller run `NexPane.exe --purge-user-data` via Inno `ExecAsOriginalUser`, which Inno does not support at uninstall time (Inno help, ExecAsOriginalUser › Remarks). S1 must choose a supported mechanism and update P4.43/P7.14.
 - Phase 1 is therefore not formally complete, but the open defect only affects uninstall design (Phase 4/7).
+
+**Phase 3 QA gate (S6, 2026-10-22): not passed.** Do not merge `phase3-core-search` until these are fixed and re-verified: P3.11 (compare all 10k MFT sizes/mtimes), P3.13 (real `sc create` service + non-elevated client test; client must open the pipe at Identification level and verify the server; dedicated journal-reset error code), P3.14 (elevated NTFS deny-ACL test; subscribe filtering must hide whole denied subtrees and drop cached verdicts on security changes), P3.16 (`RdcwWatcher` dispose/completion race frees the buffer twice), P3.22 (bound total slow-regex time per query/batch), P3.31 (notices: BouncyCastle.Cryptography, shipped status, MPL note; §15 rows), plus P3.38 (elevated USN/$MFT timing; runner UTC timestamps and dirty-tree guard). Code merges with main cleanly; only the four handoff docs conflict.
 
 Phase 2 (S7, branding) and Phase 3 (S2, core systems) can start in parallel now.
 
@@ -170,6 +172,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
     - `--filter-trait "Category=Elevated"` on `tests/NexPane.Indexing.Tests` creates and mounts a 256 MB VHDX with diskpart (no Hyper-V module needed);
     - the same filter on `tests/NexPane.IndexService.Tests` runs the NTFS backend over the system volume;
     - the SMB crawler test uses `New-SmbShare`.
+
+- **QA gotchas from P3.36:** (a) `NamedPipeClientStream` without a `TokenImpersonationLevel` lets the server fully impersonate the client — always pass `Identification` unless impersonation is really needed, and verify who owns the pipe; (b) completion callbacks of overlapped I/O and `Dispose` must agree on ownership under one lock before freeing native memory; (c) a regex timeout per `IsMatch` call is not a ReDoS guard for a million-entry scan — bound the whole evaluation; (d) privacy filters must apply the same ancestor rule to enumeration and to journal changes; (e) `(Get-Date).ToString('u')` prints local time with a `Z` — use `.ToUniversalTime()` first.
 
 ## 7. Working rules
 
