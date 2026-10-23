@@ -183,6 +183,15 @@ git check-ignore src/NexPane.Core/Models/VfsEntry.cs src/NexPane.Security/Secret
 - Added `IShellLauncher` (+ `ShellLaunchRequest`/`ShellLaunchResult`/`ShellLaunchStatus`), `Launch/ShellExecuteLauncher` (PIDL via `SHParseDisplayName`, `ShellExecuteExW` with `SEE_MASK_INVOKEIDLIST|NOASYNC|FLAG_LOG_USAGE|UNICODE`, optional `FLAG_NO_UI`), `Launch/ShellLaunchErrors` (GetLastError / HRESULT / `SE_ERR_*` → typed status), `Threading/ShellStaScheduler` (the §5 Shell STA pool, 2–4 pumping STA threads) and `AddShell(IServiceCollection, IConfiguration)`. Not wired into the UI (Phase 4).
 - Tests: 46 new test cases in `tests/NexPane.Shell.Tests` (`Launch/`, `Threading/`); the integration tests register a unique per-user extension + ProgID with marker-writing verbs (never `.txt`) and delete it in `Dispose`. Shell.Tests 56 total: 55 passed, 1 documented skip (symlinks). Default suite 791: 788 passed, 0 failed, 3 skipped. Build 0 warnings / 0 errors. Scanner 98 files, exit 0.
 - Deviations recorded in ARCHITECTURE §21 (typed result instead of `bool`; `LaunchAsync`; MAX_PATH fallback; DI abstractions packages in Shell).
+### 2026-10-22 (P3.37) — Subagent 1 (Lead Architect & State Scribe), branch `p3-archrules`
+- P3.37 → `[READY_FOR_QA]`. Added NetArchTest.Rules type-level rules in `tests/NexPane.Architecture.Tests/TypeLevelRulesTests.cs`:
+  - R1: no WPF/WinForms below L3 (types, compiled references, `FrameworkReference`, shared build files);
+  - R2: no Shell/WinRT/Win32/COM interop types and no P/Invoke in Core;
+  - R3: no externally visible P/Invoke;
+  - R4: Core-contract implementations internal (explicit test).
+- Each rule was proven by a planted violation, then reverted.
+- R4 finds 7 existing public implementations in Phase 3 code: `LocalFileSystemProvider`, `RdcwVfsWatcher`, `ContentStore`, `IndexStore`, `SearchEngine`, `QueryParser`, `QueryPrinter`. Production code was not changed; a follow-up for S2 is described in the P3.37 row.
+- Build 0/0; Architecture.Tests 134 passed / 13 explicit skipped; default suite 786 passed, 0 failed, 16 skipped; placeholder scan exit 0.
 
 ### 2026-10-22 (QA-P3) — Subagent 6 (QA)
 - Ran the Phase 3 gate P3.36 in `.worktrees\phase3`; 28 items verified, 6 rejected, P3.38 added; benchmarks and merge forecast in §3. Committed docs to `phase3-core-search` only.
