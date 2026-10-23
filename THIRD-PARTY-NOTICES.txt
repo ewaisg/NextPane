@@ -35,9 +35,9 @@ Microsoft.Windows.CsWin32 (build-time generator)   MIT                     https
 
 2. STORAGE AND SECURITY
 -----------------------
-Microsoft.Data.Sqlite                              MIT                     https://github.com/dotnet/efcore                                          [planned]
-SQLitePCLRaw.bundle_e_sqlite3                      Apache-2.0              https://github.com/ericsink/SQLitePCL.raw                                 [planned]
-SQLite                                             Public Domain           https://sqlite.org                                                        [planned]
+Microsoft.Data.Sqlite                              MIT                     https://github.com/dotnet/efcore                                          [shipped]
+SQLitePCLRaw (batteries_v2, core, provider)        Apache-2.0              https://github.com/ericsink/SQLitePCL.raw                                 [shipped]
+SQLite (e_sqlite3.dll, FTS5 enabled)               Public Domain           https://sqlite.org                                                        [shipped]
 System.Security.Cryptography.ProtectedData         MIT                     https://github.com/dotnet/runtime                                         [planned]
 System.Numerics.Tensors                            MIT                     https://github.com/dotnet/runtime                                         [planned]
 
@@ -55,12 +55,15 @@ PDFium (bundled in Docnet.Core)                    BSD-3-Clause / Apache-2.0  ht
 
 4. CONTENT EXTRACTION AND METADATA
 ----------------------------------
-UglyToad.PdfPig                                    Apache-2.0              https://github.com/UglyToad/PdfPig                                        [planned]
+PdfPig (UglyToad.PdfPig.* assemblies)              Apache-2.0              https://github.com/UglyToad/PdfPig                                        [shipped]
 PDFsharp                                           MIT                     https://github.com/empira/PDFsharp                                        [planned]
-DocumentFormat.OpenXml                             MIT                     https://github.com/dotnet/Open-XML-SDK                                    [planned]
-MimeKit                                            MIT                     https://github.com/jstedfast/MimeKit                                      [planned]
-MsgReader                                          MIT                     https://github.com/Sicos1977/MSGReader                                    [planned]
-OpenMcdf (.msg reading in Indexing)              MPL-2.0                 https://github.com/ironfede/openmcdf                                  [planned]
+DocumentFormat.OpenXml (+ .Framework)              MIT                     https://github.com/dotnet/Open-XML-SDK                                    [shipped]
+MimeKit                                            MIT                     https://github.com/jstedfast/MimeKit                                      [shipped]
+BouncyCastle.Cryptography (MimeKit dependency)     MIT                     https://github.com/bcgit/bc-csharp                                        [shipped]
+OpenMcdf (.msg reading in Indexing)                MPL-2.0                 https://github.com/ironfede/openmcdf                                      [shipped]
+  MPL-2.0: OpenMcdf is used unmodified as a separate assembly (OpenMcdf.dll). Its Source Code Form is available
+  from the project URL above (tag v3.3.0), as required by MPL-2.0 section 3.2; the license text is at
+  https://mozilla.org/MPL/2.0/.
 MetadataExtractor                                  Apache-2.0              https://github.com/drewnoakes/metadata-extractor-dotnet                   [planned]
 TagLibSharp                                        LGPL-2.1                https://github.com/mono/taglib-sharp                                      [planned]
 
