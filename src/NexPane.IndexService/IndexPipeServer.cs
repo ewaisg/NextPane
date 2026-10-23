@@ -11,7 +11,7 @@ namespace NexPane.IndexService;
 /// <summary>
 /// Named-pipe server of the Index Service (§7.5, P3.13): <c>\\.\pipe\NexPane.Index.v1</c> with
 /// <c>SYSTEM</c> full control, <c>INTERACTIVE</c> read/write and <c>NETWORK</c> denied. Each connection is served by
-/// <see cref="IndexPipeSession"/>; the client's token is captured by impersonation (<c>RunAsClient</c>) and every
+/// <see cref="IndexPipeSession"/>; the client's identification-level token is captured (<see cref="PipeClientToken"/>) and every
 /// streamed directory is checked with <see cref="DirectoryAccessCheck"/> against it (P3.14).
 /// </summary>
 internal sealed partial class IndexPipeServer(IIndexVolumeBackend backend, ILogger<IndexPipeServer> logger, string pipeName = IndexProtocol.PipeName) : BackgroundService
@@ -51,6 +51,11 @@ internal sealed partial class IndexPipeServer(IIndexVolumeBackend backend, ILogg
                 break;
             }
 
+            foreach (var faulted in clients.Where(t => t.IsFaulted))
+            {
+                LogSessionFaulted(logger, faulted.Exception!.GetBaseException());
+            }
+
             clients.RemoveAll(t => t.IsCompleted);
             clients.Add(ServeAsync(pipe, stoppingToken));
         }
@@ -68,14 +73,9 @@ internal sealed partial class IndexPipeServer(IIndexVolumeBackend backend, ILogg
                 // Called by the session after the client's Hello was read (impersonation needs received data).
                 await IndexPipeSession.RunAsync(pipe, backend, () =>
                 {
-                    pipe.RunAsClient(() =>
-                    {
-                        using var identity = WindowsIdentity.GetCurrent(TokenAccessLevels.Query | TokenAccessLevels.Duplicate | TokenAccessLevels.Impersonate);
-                        access = new DirectoryAccessCheck(identity.AccessToken);
-                    });
-                    var user = pipe.GetImpersonationUserName();
-                    LogClientConnected(logger, user);
-                    return access!.CanList;
+                    access = PipeClientToken.Capture(pipe.SafePipeHandle, out var user, out var level);
+                    LogClientConnected(logger, user ?? "(unknown)", level);
+                    return access.CanList;
                 }, ct).ConfigureAwait(false);
             }
             catch (IOException ex)
@@ -97,8 +97,11 @@ internal sealed partial class IndexPipeServer(IIndexVolumeBackend backend, ILogg
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Index client connected as {User}.")]
-    private static partial void LogClientConnected(ILogger logger, string user);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Index client connected as {User} (token level {Level}).")]
+    private static partial void LogClientConnected(ILogger logger, string user, TokenImpersonationLevel level);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Index client session failed.")]
+    private static partial void LogSessionFaulted(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Index client rejected: {Reason}")]
     private static partial void LogClientRejected(ILogger logger, string reason);

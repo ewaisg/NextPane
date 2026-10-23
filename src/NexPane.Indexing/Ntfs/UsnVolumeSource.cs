@@ -55,9 +55,9 @@ public sealed class UsnVolumeSource(IndexStore store, SegmentHandle segment, Vol
                     }, ct).ConfigureAwait(false);
                     return;
                 }
-                catch (IOException ex) when (ex.Message.Contains("full rescan", StringComparison.OrdinalIgnoreCase))
+                catch (JournalResetException ex)
                 {
-                    // ERROR_JOURNAL_ENTRY_DELETED on the service side: the journal wrapped or was reset.
+                    // IndexPipeSession.ErrorJournalReset: the journal wrapped or was reset on the service side.
                     Decision = new JournalStartDecision(JournalStartMode.FullScan, volume.NextUsn, ex.Message);
                 }
             }
@@ -101,7 +101,7 @@ public sealed class UsnVolumeSource(IndexStore store, SegmentHandle segment, Vol
                 }, ct).ConfigureAwait(false);
                 return;
             }
-            catch (InvalidDataException ex)
+            catch (JournalResetException ex)
             {
                 Decision = new JournalStartDecision(JournalStartMode.FullScan, volume.NextUsn, ex.Message);
             }

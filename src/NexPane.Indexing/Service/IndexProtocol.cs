@@ -83,6 +83,48 @@ public sealed record ErrorMessage(int Code, string Message) : IndexMessage
     public override FrameType Type => FrameType.Error;
 }
 
+/// <summary>
+/// The change journal no longer holds the requested USN (wrapped, deleted or recreated): the volume needs a full rescan.
+/// Raised by the backend, sent over the pipe as <see cref="IndexPipeSession.ErrorJournalReset"/> and raised again by the
+/// client, so callers decide on the error code, never on message text.
+/// </summary>
+public sealed class JournalResetException : IOException
+{
+    public JournalResetException()
+        : base("The change journal no longer contains the requested USN; a full rescan is required.")
+    {
+    }
+
+    public JournalResetException(string message)
+        : base(message)
+    {
+    }
+
+    public JournalResetException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>The pipe is not served by the expected Index Service process (pipe squatting, §7.5).</summary>
+public sealed class UntrustedIndexServerException : UnauthorizedAccessException
+{
+    public UntrustedIndexServerException()
+        : base("The index pipe is not served by the NexPane Index Service.")
+    {
+    }
+
+    public UntrustedIndexServerException(string message)
+        : base(message)
+    {
+    }
+
+    public UntrustedIndexServerException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
 /// <summary>Thrown for malformed frames; the connection must be closed.</summary>
 public sealed class ProtocolException : Exception
 {

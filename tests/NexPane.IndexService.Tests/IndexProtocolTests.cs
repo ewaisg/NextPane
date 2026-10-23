@@ -7,6 +7,7 @@ using NexPane.Indexing.Ntfs;
 using NexPane.Indexing.Service;
 using NexPane.Indexing.Sources;
 using NexPane.Indexing.Store;
+using NexPane.Shell.Security;
 
 namespace NexPane.IndexService.Tests;
 
@@ -131,7 +132,7 @@ public sealed class IndexProtocolTests
         await server.StartAsync(Ct);
         try
         {
-            var client = new IndexServiceClient(pipeName, TimeSpan.FromSeconds(5));
+            var client = new IndexServiceClient(pipeName, TimeSpan.FromSeconds(5), verifyServer: InProcess);
             (await client.ProbeAsync(Ct)).Should().Be(IndexServiceState.Running);
 
             await using var connection = await client.ConnectAsync(Ct);
@@ -193,6 +194,104 @@ public sealed class IndexProtocolTests
     }
 
     [Fact]
+    public async Task A_pipe_squatter_is_rejected_by_the_default_server_verification()
+    {
+        // This test process creates the pipe first, as a local attacker could: it is not the NexPaneIndex service.
+        var pipeName = "NexPane.Index.test." + Guid.NewGuid().ToString("N");
+        var squatter = new IndexPipeServer(new TreeBackend(Path.GetTempPath()), NullLogger<IndexPipeServer>.Instance, pipeName);
+        await squatter.StartAsync(Ct);
+        try
+        {
+            var client = new IndexServiceClient(pipeName, TimeSpan.FromSeconds(5), serviceName: "NexPaneIndexTestAbsent" + Guid.NewGuid().ToString("N"));
+            var connect = () => client.ConnectAsync(Ct);
+            await connect.Should().ThrowAsync<UntrustedIndexServerException>().WithMessage($"*process {Environment.ProcessId}*");
+            (await client.ProbeAsync(Ct)).Should().Be(IndexServiceState.NotInstalled, "a squatted pipe does not count as a running service");
+            IndexServiceClient.IsInstalledService(IndexServiceClient.ServiceName, Environment.ProcessId).Should().BeFalse();
+        }
+        finally
+        {
+            await squatter.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task The_client_connects_at_identification_level_so_the_server_cannot_act_as_the_user()
+    {
+        var pipeName = "NexPane.Index.test." + Guid.NewGuid().ToString("N");
+        await using var server = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+        var serving = Task.Run(async () =>
+        {
+            await server.WaitForConnectionAsync(Ct);
+            (await IndexProtocol.ReadAsync(server, Ct))!.Value.Message.Should().BeOfType<HelloMessage>();
+            using var access = PipeClientToken.Capture(server.SafePipeHandle, out var user, out var level);
+            var reverted = !PipeClientToken.ThreadIsImpersonating();
+            var canList = access.CanList(Path.GetTempPath());
+            await IndexProtocol.WriteAsync(server, new HelloMessage(IndexProtocol.Version), Ct);
+            return (level, user, reverted, canList);
+        }, Ct);
+
+        await using var connection = await new IndexServiceClient(pipeName, TimeSpan.FromSeconds(5), verifyServer: InProcess).ConnectAsync(Ct);
+
+        var (level, user, reverted, canList) = await serving;
+        level.Should().Be(TokenImpersonationLevel.Identification);
+        user.Should().Be(WindowsIdentity.GetCurrent().Name);
+        reverted.Should().BeTrue("the service thread must not keep running as the client");
+        canList.Should().BeTrue("an identification-level token is enough for AccessCheck");
+    }
+
+    [Fact]
+    public async Task A_journal_reset_travels_as_an_error_code_and_triggers_a_full_rescan_in_service_mode()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "nexpane-svc-reset-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "dir"));
+        File.WriteAllText(Path.Combine(root, "dir", "file.txt"), "x");
+        var pipeName = "NexPane.Index.test." + Guid.NewGuid().ToString("N");
+        var backend = new ResettingBackend(new TreeBackend(root));
+        var server = new IndexPipeServer(backend, NullLogger<IndexPipeServer>.Instance, pipeName);
+        await server.StartAsync(Ct);
+        try
+        {
+            var client = new IndexServiceClient(pipeName, TimeSpan.FromSeconds(5), verifyServer: InProcess);
+            var volume = backend.ListVolumes()[0];
+            await using var store = new IndexStore();
+            var segment = await store.RegisterVolumeAsync(new IndexVolumeInfo(volume.Root, VolumeKind.NtfsFixed), volume.RootFileReference, Ct);
+            var source = new UsnVolumeSource(store, segment, volume);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+
+            // The persisted position is valid, so the source resumes; the service then reports the journal reset.
+            var running = source.RunAsync(client, new JournalPosition(unchecked((long)volume.JournalId), volume.NextUsn), null, cts.Token);
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+            while (source.FullScans == 0 && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(20, Ct);
+            }
+
+            source.FullScans.Should().Be(1);
+            source.Decision!.Mode.Should().Be(JournalStartMode.FullScan);
+            source.Decision.Reason.Should().Be(ResettingBackend.Reason);
+            backend.Subscriptions.Should().BeGreaterThanOrEqualTo(1);
+            var snapshot = store.CurrentGeneration;
+            Enumerable.Range(1, snapshot.Count(segment.Id) - 1).Select(i => snapshot.GetSegment(segment.Id).GetName(i).ToString())
+                .Should().Contain("file.txt", "the rescan re-enumerated the volume");
+
+            var raw = new MemoryStream();
+            await IndexProtocol.WriteAsync(raw, new ErrorMessage(IndexPipeSession.ErrorJournalReset, "any text"), Ct);
+            raw.Position = 0;
+            (await IndexProtocol.ReadAsync(raw, Ct))!.Value.Message.Should().Be(new ErrorMessage(5, "any text"), "the code, not the text, carries the meaning");
+
+            await cts.CancelAsync();
+            await running.ContinueWith(_ => { }, CancellationToken.None);
+        }
+        finally
+        {
+            await server.StopAsync(CancellationToken.None);
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static bool InProcess(int serverProcessId) => serverProcessId == Environment.ProcessId;
+
+    [Fact]
     [Trait("Category", "Elevated")]
     public async Task Elevated_ntfs_backend_streams_the_system_volume_to_an_unprivileged_style_client()
     {
@@ -201,7 +300,7 @@ public sealed class IndexProtocolTests
         await server.StartAsync(Ct);
         try
         {
-            await using var connection = await new IndexServiceClient(pipeName, TimeSpan.FromSeconds(5)).ConnectAsync(Ct);
+            await using var connection = await new IndexServiceClient(pipeName, TimeSpan.FromSeconds(5), verifyServer: InProcess).ConnectAsync(Ct);
             var volume = (await connection.ListVolumesAsync(Ct)).First(v => v.Root.Equals(Path.GetPathRoot(Environment.SystemDirectory), StringComparison.OrdinalIgnoreCase));
             await using var store = new IndexStore();
             var segment = await store.RegisterVolumeAsync(new IndexVolumeInfo(volume.Root, VolumeKind.NtfsFixed, VolumeSerial: volume.Serial), volume.RootFileReference, Ct);
@@ -212,6 +311,25 @@ public sealed class IndexProtocolTests
         {
             await server.StopAsync(CancellationToken.None);
         }
+    }
+
+    /// <summary>Reports a journal reset on the first subscription (the message text is deliberately unrelated).</summary>
+    private sealed class ResettingBackend(IIndexVolumeBackend inner) : IIndexVolumeBackend
+    {
+        public const string Reason = "Journal 7 was recreated.";
+        private int _subscriptions;
+
+        public int Subscriptions => Volatile.Read(ref _subscriptions);
+
+        public IReadOnlyList<VolumeInfoMessage> ListVolumes() => inner.ListVolumes();
+
+        public Task<long> EnumerateAsync(string volumeGuid, Func<string, bool> canList, Func<IReadOnlyList<WireEntry>, Task> sink, CancellationToken ct) =>
+            inner.EnumerateAsync(volumeGuid, canList, sink, ct);
+
+        public Task SubscribeAsync(string volumeGuid, long fromUsn, Func<string, bool> canList, Func<IReadOnlyList<WireChange>, Task> sink, CancellationToken ct) =>
+            Interlocked.Increment(ref _subscriptions) == 1
+                ? throw new JournalResetException(Reason)
+                : inner.SubscribeAsync(volumeGuid, fromUsn, canList, sink, ct);
     }
 
     /// <summary>Test backend: serves a real temp tree, applying the client's canList check to each directory.</summary>

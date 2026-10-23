@@ -16,16 +16,18 @@ public sealed class DirectoryAccessCheck : IDisposable
     private const uint GroupSecurityInformation = 0x2;
     private const uint DaclSecurityInformation = 0x4;
     private const int TokenDuplicateAccess = 0x2 | 0x4 | 0x8; // TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY
-    private const int SecurityImpersonation = 2;
+    private const int SecurityIdentification = 1;
     private const int TokenImpersonation = 2;
 
     private readonly SafeAccessTokenHandle _impersonationToken;
 
-    /// <summary>Wraps a token (primary or impersonation) of the client; an impersonation duplicate is created.</summary>
+    /// <summary>Wraps a token (primary, or an impersonation token at identification level or above) of the client. The
+    /// duplicate is an identification-level impersonation token: enough for <c>AccessCheck</c>, and the only level
+    /// available when the client connected with <c>SECURITY_IDENTIFICATION</c> (§7.5).</summary>
     public DirectoryAccessCheck(SafeAccessTokenHandle clientToken)
     {
         ArgumentNullException.ThrowIfNull(clientToken);
-        if (!DuplicateTokenEx(clientToken, TokenDuplicateAccess, IntPtr.Zero, SecurityImpersonation, TokenImpersonation, out var duplicate))
+        if (!DuplicateTokenEx(clientToken, TokenDuplicateAccess, IntPtr.Zero, SecurityIdentification, TokenImpersonation, out var duplicate))
         {
             throw new UnauthorizedAccessException($"DuplicateTokenEx failed with Win32 error {Marshal.GetLastPInvokeError()}.");
         }

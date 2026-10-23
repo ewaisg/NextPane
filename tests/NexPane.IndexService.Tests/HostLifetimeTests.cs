@@ -8,7 +8,7 @@ public sealed class HostLifetimeTests
     [Fact]
     public async Task Host_starts_and_stops_cleanly_within_timeout()
     {
-        using var host = Program.BuildHost([]);
+        using var host = Program.BuildHost(["--pipe", "NexPane.Index.test." + Guid.NewGuid().ToString("N")]); // not the production pipe name
         var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
         var started = false;
         var stopped = false;

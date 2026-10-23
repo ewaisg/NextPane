@@ -108,7 +108,7 @@ public sealed class NtfsVolumeBackend : IIndexVolumeBackend
                 var result = volume.ReadJournal(next, info.JournalId, buffer);
                 if (result.Error == NtfsVolume.ErrorJournalEntryDeleted)
                 {
-                    throw new InvalidDataException("The change journal no longer contains the requested USN; a full rescan is required.");
+                    throw new JournalResetException();
                 }
 
                 if (!result.Succeeded)

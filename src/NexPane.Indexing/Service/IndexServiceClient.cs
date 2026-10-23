@@ -1,19 +1,37 @@
 using System.IO.Pipes;
+using System.Security.Principal;
 using Microsoft.Win32;
 using NexPane.Core.Indexing;
 using NexPane.Indexing.Sources;
 using NexPane.Indexing.Store;
+using NexPane.Shell.Security;
 
 namespace NexPane.Indexing.Service;
 
 /// <summary>
-/// Client of the NexPane Index Service pipe <c>\\.\pipe\NexPane.Index.v1</c> (§7.5, P3.13): probes availability,
+/// Client of the NexPane Index Service pipe <c>\.\pipe\NexPane.Index.v1</c> (§7.5, P3.13): probes availability,
 /// lists volumes, streams a volume's entries into the <see cref="IndexStore"/> and follows its journal.
+/// The client connects with <c>SECURITY_IDENTIFICATION</c> (the server can check the user's access but never act as the
+/// user) and only talks to a verified server: by default the pipe's server process must be the running
+/// <paramref name="serviceName"/> service (process id from the Service Control Manager) configured as LocalSystem with
+/// the <c>NexPane.IndexService.exe</c> image, so a process that squats the pipe name is rejected.
 /// </summary>
-public sealed class IndexServiceClient(string pipeName = IndexProtocol.PipeName, TimeSpan? connectTimeout = null) : IIndexServiceProbe
+/// <param name="verifyServer">Overrides the server check (tests that host the server in-process); receives the server's process id.</param>
+public sealed class IndexServiceClient(string pipeName = IndexProtocol.PipeName, TimeSpan? connectTimeout = null, string serviceName = IndexServiceClient.ServiceName,
+    Func<int, bool>? verifyServer = null) : IIndexServiceProbe
 {
     public const string ServiceName = "NexPaneIndex";
+    public const string ServiceImage = "NexPane.IndexService.exe";
     private readonly TimeSpan _connectTimeout = connectTimeout ?? TimeSpan.FromMilliseconds(500);
+    private readonly Func<int, bool> _verifyServer = verifyServer ?? (pid => IsInstalledService(serviceName, pid));
+
+    /// <summary>True when <paramref name="processId"/> is the running <paramref name="service"/> (LocalSystem, NexPane image).</summary>
+    public static bool IsInstalledService(string service, int processId)
+    {
+        var info = ServerIdentity.TryQueryService(service);
+        return info is { Running: true, RunsAsLocalSystem: true } && info.ProcessId == processId && processId != 0 &&
+               string.Equals(info.ImageFileName, ServiceImage, StringComparison.OrdinalIgnoreCase);
+    }
 
     public async Task<IndexServiceState> ProbeAsync(CancellationToken ct)
     {
@@ -31,6 +49,11 @@ public sealed class IndexServiceClient(string pipeName = IndexProtocol.PipeName,
         {
             return IndexServiceState.Outdated;
         }
+        catch (UntrustedIndexServerException)
+        {
+            // Someone else serves the pipe name: the real service is not running (or not installed).
+            return ServiceInstalled() ? IndexServiceState.Stopped : IndexServiceState.NotInstalled;
+        }
         catch (IOException)
         {
             return ServiceInstalled() ? IndexServiceState.Stopped : IndexServiceState.NotInstalled;
@@ -41,10 +64,15 @@ public sealed class IndexServiceClient(string pipeName = IndexProtocol.PipeName,
     /// <exception cref="ProtocolException">The service speaks another protocol version ("Index service outdated").</exception>
     public async Task<Connection> ConnectAsync(CancellationToken ct)
     {
-        var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+        var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous, TokenImpersonationLevel.Identification);
         try
         {
             await pipe.ConnectAsync(_connectTimeout, ct).ConfigureAwait(false);
+            if (!ServerIdentity.TryGetPipeServerProcessId(pipe.SafePipeHandle, out var serverPid) || !_verifyServer(serverPid))
+            {
+                throw new UntrustedIndexServerException($"The pipe {pipeName} is served by process {serverPid}, which is not the {serviceName} service.");
+            }
+
             await IndexProtocol.WriteAsync(pipe, new HelloMessage(IndexProtocol.Version), ct).ConfigureAwait(false);
             var reply = await IndexProtocol.ReadAsync(pipe, ct).ConfigureAwait(false);
             if (reply?.Message is not HelloMessage { Version: IndexProtocol.Version })
@@ -61,9 +89,9 @@ public sealed class IndexServiceClient(string pipeName = IndexProtocol.PipeName,
         }
     }
 
-    private static bool ServiceInstalled()
+    private bool ServiceInstalled()
     {
-        using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\" + ServiceName);
+        using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\" + serviceName);
         return key is not null;
     }
 
@@ -82,7 +110,7 @@ public sealed class IndexServiceClient(string pipeName = IndexProtocol.PipeName,
                         volumes.Add(v);
                         break;
                     case ErrorMessage e:
-                        throw new IOException($"Index service error {e.Code}: {e.Message}");
+                        throw ToException(e);
                 }
 
                 if ((frame.Flags & FrameOptions.Final) != 0)
@@ -112,7 +140,7 @@ public sealed class IndexServiceClient(string pipeName = IndexProtocol.PipeName,
                         await store.FlushAsync(ct).ConfigureAwait(false);
                         return done.NextUsn;
                     case ErrorMessage e:
-                        throw new IOException($"Index service error {e.Code}: {e.Message}");
+                        throw ToException(e);
                 }
             }
 
@@ -151,12 +179,17 @@ public sealed class IndexServiceClient(string pipeName = IndexProtocol.PipeName,
                     }
 
                     case ErrorMessage e:
-                        throw new IOException($"Index service error {e.Code}: {e.Message}");
+                        throw ToException(e);
                 }
             }
         }
 
         public ValueTask DisposeAsync() => stream.DisposeAsync();
+
+        /// <summary>Maps a service error to an exception by its code (<see cref="IndexPipeSession.ErrorJournalReset"/> → <see cref="JournalResetException"/>).</summary>
+        private static IOException ToException(ErrorMessage error) => error.Code == IndexPipeSession.ErrorJournalReset
+            ? new JournalResetException(error.Message)
+            : new IOException($"Index service error {error.Code}: {error.Message}");
 
         /// <summary>The service sends no sizes with changes: stat each file by its path (parent path from the index +
         /// name), which works unelevated.</summary>

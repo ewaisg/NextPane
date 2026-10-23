@@ -24,6 +24,9 @@ public static class IndexPipeSession
     public const int ErrorBackend = 3;
     public const int ErrorProtocol = 4;
 
+    /// <summary>The journal no longer holds the requested USN: the client must reset the volume and re-enumerate.</summary>
+    public const int ErrorJournalReset = 5;
+
     public static async Task RunAsync(Stream stream, IIndexVolumeBackend backend, Func<Func<string, bool>> accessFactory, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -84,6 +87,10 @@ public static class IndexPipeSession
                         return;
                 }
             }
+        }
+        catch (JournalResetException ex)
+        {
+            await TryWriteErrorAsync(stream, ErrorJournalReset, ex.Message).ConfigureAwait(false);
         }
         catch (ProtocolException ex)
         {
