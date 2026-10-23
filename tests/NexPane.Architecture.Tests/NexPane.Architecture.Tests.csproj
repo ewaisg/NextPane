@@ -4,4 +4,27 @@
     <RootNamespace>NexPane.Architecture.Tests</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="NetArchTest.Rules" />
+  </ItemGroup>
+
+  <!-- Every module below L3 (ARCHITECTURE §4) is referenced so its compiled assembly is copied next to the tests;
+       the type-level rules (P3.37) read those files with Mono.Cecil via NetArchTest.Rules. L3 (App, Preview) may use WPF
+       and is deliberately not referenced. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NexPane.Core\NexPane.Core.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.Shell\NexPane.Shell.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.Storage\NexPane.Storage.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.Security\NexPane.Security.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.Indexing\NexPane.Indexing.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.Search\NexPane.Search.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.Archives\NexPane.Archives.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.Network\NexPane.Network.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.Sync\NexPane.Sync.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.Metadata\NexPane.Metadata.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.Scripting\NexPane.Scripting.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.AI\NexPane.AI.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.IndexService\NexPane.IndexService.csproj" />
+  </ItemGroup>
+
 </Project>

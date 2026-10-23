@@ -17,5 +17,6 @@
     <!-- Pinned: FluentAssertions 8+ is commercially licensed (Xceed). Do not upgrade. -->
     <PackageVersion Include="FluentAssertions" Version="[7.2.0]" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+    <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
   </ItemGroup>
 </Project>

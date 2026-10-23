@@ -163,6 +163,16 @@ git check-ignore src/NexPane.Core/Models/VfsEntry.cs src/NexPane.Security/Secret
 
 ## 7. Session log
 
+### 2026-10-22 (P3.37) — Subagent 1 (Lead Architect & State Scribe), branch `p3-archrules`
+- P3.37 → `[READY_FOR_QA]`. Added NetArchTest.Rules type-level rules in `tests/NexPane.Architecture.Tests/TypeLevelRulesTests.cs`:
+  - R1: no WPF/WinForms below L3 (types, compiled references, `FrameworkReference`, shared build files);
+  - R2: no Shell/WinRT/Win32/COM interop types and no P/Invoke in Core;
+  - R3: no externally visible P/Invoke;
+  - R4: Core-contract implementations internal (explicit test).
+- Each rule was proven by a planted violation, then reverted.
+- R4 finds 7 existing public implementations in Phase 3 code: `LocalFileSystemProvider`, `RdcwVfsWatcher`, `ContentStore`, `IndexStore`, `SearchEngine`, `QueryParser`, `QueryPrinter`. Production code was not changed; a follow-up for S2 is described in the P3.37 row.
+- Build 0/0; Architecture.Tests 134 passed / 13 explicit skipped; default suite 786 passed, 0 failed, 16 skipped; placeholder scan exit 0.
+
 ### 2026-10-22 (QA-P3) — Subagent 6 (QA)
 - Ran the Phase 3 gate P3.36 in `.worktrees\phase3`; 28 items verified, 6 rejected, P3.38 added; benchmarks and merge forecast in §3. Committed docs to `phase3-core-search` only.
 

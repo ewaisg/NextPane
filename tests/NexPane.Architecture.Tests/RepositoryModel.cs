@@ -11,7 +11,8 @@ internal sealed record ProjectInfo(
     bool UsesWindowsForms,
     IReadOnlyList<string> ProjectReferences,
     IReadOnlyList<string> AssemblyReferences,
-    IReadOnlyList<(string Package, string? Version)> PackageReferences);
+    IReadOnlyList<(string Package, string? Version)> PackageReferences,
+    IReadOnlyList<string> FrameworkReferences);
 
 /// <summary>Discovers the repository root and parses every project under src/, tests/ and tools/.</summary>
 internal static class RepositoryModel
@@ -59,6 +60,10 @@ internal static class RepositoryModel
             .Select(e => ((string?)e.Attribute("Include") ?? string.Empty, (string?)e.Attribute("Version")))
             .ToList();
 
+        var frameworkRefs = doc.Descendants("FrameworkReference")
+            .Select(e => (string?)e.Attribute("Include") ?? string.Empty)
+            .ToList();
+
         return new ProjectInfo(
             Path.GetFileNameWithoutExtension(csprojPath),
             csprojPath,
@@ -67,7 +72,8 @@ internal static class RepositoryModel
             string.Equals(Prop("UseWindowsForms"), "true", StringComparison.OrdinalIgnoreCase),
             projectRefs,
             assemblyRefs,
-            packages);
+            packages,
+            frameworkRefs);
     }
 
     private static string FindRoot()
