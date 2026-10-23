@@ -1,14 +1,15 @@
 # NexPane — Current State
 
 > Updated by every subagent at the end of every session. Newest entry is at the top of the Session Log.
-> Last update: **2026-10-21 (k)** by **the orchestrator**: merged `phase2-branding` into `main` — **Phase 1 complete (14/14), Phase 2 complete (P2.01–P2.09)**.
+> Last update: **2026-10-23 (m)** by **the orchestrator**: merged `phase3-core-search` into `main` — **Phases 1–3 complete** (Phase 3 gate P3.36 passed at b2ee822; all P3.01–P3.39 `[VERIFIED_COMPLETE]`).
 > Roster (user-mandated numbering): S1 Architect & State Scribe · S2 Core Systems & Indexing Engine · S3 Native Windows Shell & OS Integration · S4 AI & Semantic Pipeline · S5 UI/UX & Workspace · **S6 QA, Verification & Security Inspector (veto)** · S7 Release & Installer Packaging (incl. icons/assets). Older log entries below that say "S7 QA role" refer to the QA role, which is now **S6**.
 
 ## 1. Snapshot
 
 | Item | Value |
 |---|---|
-| Current phase | **Phase 1 — COMPLETE: 14/14 `[VERIFIED_COMPLETE]`** (S6, after 5f64ea8). **Phase 2 — COMPLETE: P2.01–P2.09 `[VERIFIED_COMPLETE]`** (S6 gate; merged into `main` by the orchestrator). Phase 3 (S2) in progress in worktree `.worktrees\phase3`, branch `phase3-core-search` |
+| Current phase | **Phase 1 — COMPLETE (14/14)**, **Phase 2 — COMPLETE (P2.01–P2.09)**, **Phase 3 — COMPLETE (P3.01–P3.39, gate P3.36 passed by S6 at b2ee822)**; all merged into `main`. Next: **Phase 4** (dual-pane UI, tabs, preview, native shell) |
+| **Phase 3 gate (P3.36)** | **PASSED (S6, 2026-10-23, HEAD b2ee822).** All 39 Phase 3 items `[VERIFIED_COMPLETE]`; build 0/0, 859/862 tests (3 documented skips), elevated suite 9/9 user-run. Ready to merge into `main` |
 | Placeholder scanner (P1.12) | `eng\check-placeholders.ps1` → **26 files, 0 violations, 0 allowlisted, 0 stale, exit 0**. The four `TODO P1.11` cross-references now read "task(s) P1.11"; `eng\placeholder-allowlist.json` has `"entries": []` |
 | Toolchain | .NET SDK 10.0.402, Git 2.55.0, Inno Setup 6.7.3 (per-user: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) |
 | Pipeline (P1.11) | `eng\build.ps1` → `eng\publish.ps1` → `eng\installer.ps1 -AllowMissingBranding` → unversioned `dist\NexPane-Setup.exe` (55.35 MB, ProductVersion 0.1.0; never executed) |
@@ -38,6 +39,9 @@ C:\Users\Ewais\Projects\NexPane\
 Package pins: Microsoft.Extensions.Hosting.WindowsServices 10.0.13, xunit.v3.mtp-v2 4.0.2, FluentAssertions [7.2.0], BenchmarkDotNet 0.15.8.
 
 ## 3. Just finished
+
+**2026-10-23 (m), orchestrator: merged `phase3-core-search` into `main`**
+- Conflicts resolved: `Directory.Packages.props` and `NexPane.Shell.csproj` keep both sides; ARCHITECTURE §21 keeps both sides' decision rows; TODO.md = main's file with the branch's Phase 3 section (the branch changed nothing else in TODO.md); HANDOFF/STATE keep main's Phase 1–2 text and the branch's Phase 3 text. Post-merge results are in the merge commit message.
 
 **2026-10-21 (k), orchestrator: merged `phase2-branding` into `main`**
 - Doc conflicts resolved: main's Phase 1 text kept; the branch's Phase 2 rows/notes taken. Code and assets merged cleanly. Post-merge `eng\build.ps1` and `eng\check-placeholders.ps1` re-run (results in the merge commit message).
@@ -88,6 +92,66 @@ Package pins: Microsoft.Extensions.Hosting.WindowsServices 10.0.13, xunit.v3.mtp
 - **TODO:** P4.43 and P7.14 acceptance rewritten (admin-mode keeps data with a message; per-user Yes/No/silent cases; `.iss` grep for no `ExecAsOriginalUser` or user-folder `DelTree`). §22 E3 updated. P1.02 → `[READY_FOR_QA]`.
 - **Checks:** build 0 warnings / 0 errors; tests **108/108**; `check-placeholders.ps1` exit 0. Phase 3 worktree not touched.
 
+**2026-10-23 (QA-P3b), S6: Phase 3 gate re-run — PASSED**
+- Re-verified the 6 rejected items, P3.34, P3.37, P3.38 and P3.39 in `.worktrees\phase3` at b2ee822 (power: AC). Evidence per item in TODO.md.
+- `eng\build.ps1` exit 0: 0 warnings, 0 errors, 862 tests, 859 passed, 3 documented skips. `eng\check-placeholders.ps1` 103 files, 0 violations. Planted WPF/FrameworkReference/public-implementation violations → 4 architecture-test failures, reverted, 147/147.
+- Elevated evidence: user-run `build\elevated-tests.log` + `build\elevated-metrics.txt` for b2ee822 (clean tree, UTC, AC): 9 passed, 1 by-design skip. Test code reviewed against each acceptance (full 10k parity, deny-ACL subtree hidden initially and live, `sc create` service + `runas /trustlevel:0x20000` client, budgets with record counts). No leftover test service, SMB share, VHDX, volume, registry key or temp tree after the runs.
+- Benchmarks (AC, means): cold 1M 0.99 ms; 5M 6.18 ms; incremental refinement 0.048 ms; broad next keystroke medians 0.13–0.61 ms (worst mean 0.82 ms, p95 ≈ 1.8 ms; budget p50 1 / p95 3 ms); regex ReDoS 45.5 ms; `path:` 30.8 ms; `GetFullPath` 1M 166 ms; snapshot 1M 856 ms; FTS 0.35 / 8.5 / 13.0 ms; USN 1.25 s/1M; $MFT 2.26 s/1M.
+- **Merge recipe (main 4589ad1):** `git merge-tree` reports conflicts in `docs/handoff/ARCHITECTURE.md`, `HANDOFF.md`, `STATE.md`, `TODO.md`, `Directory.Packages.props` and `src/NexPane.Shell/NexPane.Shell.csproj`. Resolve the two code files by keeping both sides (main: System.Drawing.Common + FlaUI.UIA3 pins; branch: Microsoft.Extensions.Configuration/DependencyInjection + NetArchTest.Rules pins and `InternalsVisibleTo NexPane.Indexing.Tests`). Docs: main's Phase 1/2 text, this branch's Phase 3 text, both sides' §21 rows. QA built such a resolution in a throwaway worktree: 0/0, 936/939 tests, placeholder scan clean. Re-run `eng\build.ps1` after the real merge.
+- Advisories (no gate impact): `AddShell` mixes `TryAddSingleton`/`AddSingleton`; the Index Service takes `pipe` from any configuration source (prefer command line only).
+
+
+**2026-10-22 (QA-P3), S6: Phase 3 gate P3.36 — NOT passed**
+- Worked in `.worktrees\phase3` only (absolute paths); scratch output in the S6 scratchpad. Power: **AC** (Win32_Battery status 2, 99 %). CPU: AMD Ryzen 9 9955HX, 16C/32T.
+- Independent runs: `eng\build.ps1` exit 0 — **0 warnings, 0 errors; 745 tests, 742 passed, 3 skipped** (2 opt-in fixture regenerators, 1 symlink test without Developer Mode); all battery-conditional timing gates ran and passed. `eng\check-placeholders.ps1` exit 0 (92 files, 0 violations, 0 allowlisted). Migration SQL identical to ARCHITECTURE §9.
+- Elevated evidence: user-run `build\elevated-tests.log` names commit 25da0df = HEAD (tree clean now), AC power, build 0/0, 5/5 `Category=Elevated` tests passed. Runner caveats → P3.38: the log's "Z" times are local time (`ToString('u')` without `ToUniversalTime()`), and the runner does not record or refuse a dirty working tree.
+- **Benchmarks** (BenchmarkDotNet `--filter *`, AC power, means):
+
+| Benchmark | Measured | Budget (§17) |
+|---|---|---|
+| Cold literal substring, 1M | 1.05 ms (σ 0.03) | p50 ≤ 5 / p95 ≤ 15 ms |
+| Incremental refinement, 1M | 0.048 ms | p50 ≤ 1 / p95 ≤ 3 ms |
+| Broad refinement worst (`re`→`rep`), 1M | mean 0.69, median 0.55, σ 0.27 ms (p95 ≈ 1.1) | p50 ≤ 1 / p95 ≤ 3 ms |
+| Regex `(a+)+$` NonBacktracking, 1M | 43.6 ms | p95 ≤ 150 ms |
+| `path:` directory set, 1M | 27.2 ms | ≤ 50 ms |
+| Cold literal substring, 5M | 5.94 ms | p95 ≤ 60 ms |
+| `GetFullPath` × 1M | 148.2 ms | ≤ 400 ms |
+| Snapshot load, 1M | 800 ms | ≤ 2 s |
+| FTS5 100k docs (phrase / term / prefix) | 0.29 / 6.4 / 12.3 ms | p95 ≤ 50 ms |
+| USN enumeration, raw $MFT fill per 1M | **not measured** | ≤ 5 s / ≤ 10 s → P3.38 |
+
+- **Rejections (details in TODO.md):** P3.11 size/mtime parity samples 1/97 of the 10k files; P3.13 no `sc create` + non-elevated client test (QA decision: testable on the dev machine, not deferred to Phase 7), client pipe opened at default SecurityImpersonation without server verification (pipe-squatting impersonation when the service is absent), journal reset detected by message substring; P3.14 no elevated NTFS deny-ACL test, `SubscribeAsync` checks only the direct parent (changes under descendants of a denied folder leak), verdict cache never invalidated on security changes; P3.16 `RdcwWatcher.Dispose` can double-free the native buffer; P3.22 slow-mode regex has a per-match timeout but no per-query/batch budget; P3.31 THIRD-PARTY-NOTICES lacks BouncyCastle.Cryptography and still marks shipped packages `[planned]`, §15 still lists MsgReader/UglyToad.PdfPig.
+- Other review results (no defect): FTS5 queries quote every token and bind parameters (no FTS/SQL injection); the only interpolated SQL is an enum list and `PRAGMA user_version`; no PowerShell/process launches in `src` (share names only in tests); lock-free index readers reviewed (publication ordering, append-only arenas, epoch-based path cache) and found sound; sync-over-async only on dedicated writer/worker threads; `SettingsStore.Open` writes synchronously (call it off the UI thread).
+- **Merge forecast vs main 4589ad1:** `git merge-tree` → only `docs/handoff/ARCHITECTURE.md`, `HANDOFF.md`, `STATE.md`, `TODO.md` conflict; `Directory.Packages.props`, `THIRD-PARTY-NOTICES.txt`, the solution and all code auto-merge. A throwaway merged worktree (docs resolved arbitrarily, never committed, then removed) built with 0 warnings / 0 errors and passed 819 of 822 tests (same 3 skips), placeholder scan clean (102 files). Resolve the doc conflicts by keeping main's Phase 1/2 text and this branch's Phase 3 text, and append both sides' §21 rows.
+
+**2026-10-22, S2 (Core Systems & Indexing Engine): Phase 3 on branch `phase3-core-search` (worktree `.worktrees\phase3`, not merged)**
+
+| Result | Detail |
+|---|---|
+| Items | 27 `[READY_FOR_QA]`: P3.01–P3.09, P3.15–P3.17, P3.19–P3.23, P3.25–P3.33, P3.35. 7 `[IN_PROGRESS]`: P3.10–P3.14 and P3.18 (code done; their `[Elevated]` acceptance tests are written but not run, because this session was not elevated), and P3.24 (p50 budget missed for broad keystrokes). P3.34 (S3), P3.36 (S6) and P3.37 (S1) are not S2's. |
+| Build | `dotnet build NexPane.sln -c Release`: 0 warnings, 0 errors |
+| Tests | Default filter: total 742, failed 0, succeeded 737, skipped 5. The skips are: the symlink test (Developer Mode off), 2 fixture regenerators (opt-in via `NEXPANE_REGENERATE_FIXTURES=1`), and timing gates that skip only when exceeded on battery power. |
+| Scanner | `eng\check-placeholders.ps1`: 89 files, 0 violations, 0 allowlisted, exit 0 |
+| Shared files touched | `Directory.Packages.props` (+Microsoft.Data.Sqlite 10.0.13, DocumentFormat.OpenXml 3.5.1, MimeKit 4.18.2, PdfPig 0.1.16, OpenMcdf 3.3.0); `src/NexPane.Shell/NexPane.Shell.csproj` (now byte-identical to main 4589ad1); `src/NexPane.IndexService/Program.cs` plus new `IndexPipeServer.cs` (the csproj is untouched); `THIRD-PARTY-NOTICES.txt` (+1 OpenMcdf line); `docs/handoff/ARCHITECTURE.md` (§21 rows only); `tests/NexPane.Indexing.Tests/NexPane.Indexing.Tests.csproj` (+Search reference). `NexPane.sln` is not touched. |
+
+Benchmarks (`dotnet run -c Release --project tests/NexPane.Benchmarks -- --filter *`; Ryzen 9 9955HX, 32 threads; **laptop on battery power** for these runs, so the numbers are pessimistic):
+
+| Budget (§17) | Measured (mean) | Verdict |
+|---|---|---|
+| Cold substring 1M: p50 ≤ 5 ms, p95 ≤ 15 ms | 0.81–1.40 ms (`invoice_00`); unit test p95 over 8 queries incl. broad ones is within 2× | met |
+| Incremental refinement 1M: p50 ≤ 1 ms, p95 ≤ 3 ms | After the P3.24 fix, on AC: broad `in`→`inv` median 0.60 ms, `re`→`rep` 0.66 ms, `invoice_0`→`invoice_00` 0.14 ms, narrow 53 µs. Before: broad keystrokes about 2.9 ms p50 | met (fixed 2026-10-22 c) |
+| Cold substring 5M: p95 ≤ 60 ms | 8.0 ms | met |
+| Name regex NonBacktracking 1M: p95 ≤ 150 ms | 48.8–55.5 ms (`(a+)+$`) | met |
+| `path:` dir-set 1M: ≤ 50 ms | 27.7–33.6 ms | met |
+| `GetFullPath` × 1M: ≤ 400 ms | 177–201 ms (after the lock-free cache; 796 ms before) | met |
+| Snapshot load 1M: ≤ 2 s | 853–860 ms | met |
+| FTS5 100k documents: p95 ≤ 50 ms | phrase 0.30 ms, frequent term 7.2 ms, prefix 13.5–15.8 ms | met |
+| Index memory ≤ 160 MB / 1M | below 160 MB managed heap (test passes; structural estimate 134 MB) | met |
+| Walker ≥ 50k entries/s warm | about 1.37 M entries/s | met |
+| FS change visible ≤ 1 s (local) | create/rename/move-in/delete each ≤ 1 s (test) | met |
+| USN enumeration ≤ 5 s / $MFT fill ≤ 10 s per 1M | not measured (needs elevation) | open |
+
+
 **2026-10-21 (f), S6 QA: re-verification of S1 commit 180b0c0**
 
 | Item | Verdict | Evidence |
@@ -126,7 +190,8 @@ TODO totals: 183 items: 9 VERIFIED_COMPLETE, 5 READY_FOR_QA, the rest PENDING.
 |---|---|---|---|
 | Phase 1 | — | `[VERIFIED_COMPLETE]` 14/14 | Closed |
 | Phase 2 (branding/assets) | S7 / S6 | `[VERIFIED_COMPLETE]` P2.01–P2.09 | Merged into `main` |
-| Phase 3 (core FS, indexer, search) | **S2** | `[IN_PROGRESS]` | Worktree `.worktrees\phase3`, branch `phase3-core-search`; S6 gate P3.36 there before the orchestrator merges |
+| Phase 3 (core FS, indexer, search) | S2 (+S3 P3.34, S1 P3.37) / S6 | `[VERIFIED_COMPLETE]` P3.01–P3.39 | Merged into `main` (2026-10-23) |
+| Phase 4 (dual-pane UI, tabs, preview, native shell) | **S5** with **S3** | `[PENDING]` | Next phase |
 
 ## 5. Active issues / risks
 1. **Deviations from the original plan** (all recorded in ARCHITECTURE §21):
@@ -195,6 +260,78 @@ Select-String -Path docs\handoff\ARCHITECTURE.md -Pattern 'ExecAsOriginalUser'  
 - Reworked the P1.02 uninstall user-data mechanism after S6's rejection, verifying every Inno API against the installed 6.7.3 help.
 - Chose app-owned per-user removal (P4.43) plus an uninstaller purge only for per-user installs via plain `Exec`. Recorded in §19.3/§21; P4.43/P7.14 acceptance and §22 E3 updated.
 - Build 0/0, tests 108/108, scan exit 0. Scratchpad help copy deleted. Did not touch `.worktrees\phase3`.
+### 2026-10-23 (QA-P3b) — Subagent 6 (QA)
+- Phase 3 gate re-run at b2ee822: every P3 item verified, P3.36 `[VERIFIED_COMPLETE]`; merge recipe in §3. Committed docs to `phase3-core-search` only.
+
+### 2026-10-23 (f) — Subagent 2: USN enumeration budget (P3.38)
+- The elevated run at `e034ded` passed 9 of 10. It failed only the USN enumeration budget: 8.53 s per 1M against 5 s.
+- `UsnEnumerator` rewritten: V2 records, 4 MB batches, the IOCTL overlapped with in-place parsing, no per-record allocation, and IOCTL/parse times reported separately. Parse + fill measures under 0.1 s per 1M (synthetic).
+- §21: the initial fill reads the raw $MFT (2.48 s per 1M); USN enumeration is the fallback. Default suite 862, 0 failed. Needs another elevated run.
+
+### 2026-10-23 (e) — Subagent 2: Phase 3 QA rejects and P3.39
+- Commits after the gate `f852016`:
+  - `77b53bf` P3.31: license notices and §15.
+  - `8e09726` P3.16: `RdcwWatcher` ownership handshake; 10k-watcher stress test.
+  - `b884139` P3.22: per-query regex budget; live queries keep the abort.
+  - `cab3609` P3.11 and P3.38: full size/mtime parity, system-volume budget tests; the runner logs UTC and refuses dirty trees.
+  - `0e476c0` P3.14: journal ancestor rule and a bounded, invalidated cache.
+  - `b995326` P3.13: identification-only pipe, SCM server verification, reset error code. Also: the service exe now hosts the pipe server, which it did not before. Elevated test: `sc create` plus a `runas /trustlevel` client.
+  - `eb4f660` P3.39: 7 internal implementations behind Core interfaces, `AddShell`/`AddIndexing`/`AddSearch`.
+- Found and fixed along the way:
+  - `FileReferencePath` never stripped `\?\`.
+  - `RunAsClient` left service threads impersonating at identification level, so `GetFileSecurity` failed with 1346; replaced by `PipeClientToken`.
+- Default suite 756: 0 failed, 3 skipped. Scanner: 98 files, 0 violations. Build: 0 warnings.
+- Needs the user's elevated run (`eng\run-elevated-tests.ps1`): P3.10, P3.11, P3.13, P3.14, P3.38.
+
+### 2026-10-22 (S3-P3.34) — Subagent 3: ShellExecuteEx launch service
+- Branch `p3-shellexec` (worktree `.worktrees\p3-shell`, from `phase3-core-search` @ f852016); code commit 9e65a1e.
+- Added `IShellLauncher` (+ `ShellLaunchRequest`/`ShellLaunchResult`/`ShellLaunchStatus`), `Launch/ShellExecuteLauncher` (PIDL via `SHParseDisplayName`, `ShellExecuteExW` with `SEE_MASK_INVOKEIDLIST|NOASYNC|FLAG_LOG_USAGE|UNICODE`, optional `FLAG_NO_UI`), `Launch/ShellLaunchErrors` (GetLastError / HRESULT / `SE_ERR_*` → typed status), `Threading/ShellStaScheduler` (the §5 Shell STA pool, 2–4 pumping STA threads) and `AddShell(IServiceCollection, IConfiguration)`. Not wired into the UI (Phase 4).
+- Tests: 46 new test cases in `tests/NexPane.Shell.Tests` (`Launch/`, `Threading/`); the integration tests register a unique per-user extension + ProgID with marker-writing verbs (never `.txt`) and delete it in `Dispose`. Shell.Tests 56 total: 55 passed, 1 documented skip (symlinks). Default suite 791: 788 passed, 0 failed, 3 skipped. Build 0 warnings / 0 errors. Scanner 98 files, exit 0.
+- Deviations recorded in ARCHITECTURE §21 (typed result instead of `bool`; `LaunchAsync`; MAX_PATH fallback; DI abstractions packages in Shell).
+### 2026-10-22 (P3.37) — Subagent 1 (Lead Architect & State Scribe), branch `p3-archrules`
+- P3.37 → `[READY_FOR_QA]`. Added NetArchTest.Rules type-level rules in `tests/NexPane.Architecture.Tests/TypeLevelRulesTests.cs`:
+  - R1: no WPF/WinForms below L3 (types, compiled references, `FrameworkReference`, shared build files);
+  - R2: no Shell/WinRT/Win32/COM interop types and no P/Invoke in Core;
+  - R3: no externally visible P/Invoke;
+  - R4: Core-contract implementations internal (explicit test).
+- Each rule was proven by a planted violation, then reverted.
+- R4 finds 7 existing public implementations in Phase 3 code: `LocalFileSystemProvider`, `RdcwVfsWatcher`, `ContentStore`, `IndexStore`, `SearchEngine`, `QueryParser`, `QueryPrinter`. Production code was not changed; a follow-up for S2 is described in the P3.37 row.
+- Build 0/0; Architecture.Tests 134 passed / 13 explicit skipped; default suite 786 passed, 0 failed, 16 skipped; placeholder scan exit 0.
+
+### 2026-10-22 (QA-P3) — Subagent 6 (QA)
+- Ran the Phase 3 gate P3.36 in `.worktrees\phase3`; 28 items verified, 6 rejected, P3.38 added; benchmarks and merge forecast in §3. Committed docs to `phase3-core-search` only.
+
+### 2026-10-22 (d) — Subagent 2: MFT directory classification fix
+- The elevated re-run at `762b552` (AC) passed the metafile parity check. It found another product bug: `M:\System Volume Information` was indexed as a file (FileNotFoundException in the size loop).
+- Root cause: `MftReader` sent the `$STANDARD_INFORMATION` attributes. On NTFS these never contain FILE_ATTRIBUTE_DIRECTORY (0x10), because directories are marked by record header flag 0x0002 (and 0x10000000 in `$FILE_NAME`). The store derives the directory flag from `Attributes & 0x10`, so every MFT-enumerated directory became a file. The journal path was not affected (USN records and the by-id stat carry 0x10). The old directory fixture wrote 0x10 into `$SI`, which hid the bug.
+- Fix: `MftReader.ToStat` sets 0x10 from the record header and clears the NTFS-internal 0x10000000 bit.
+- New fixture `tests/TestAssets/mft/directory.bin` (as NTFS writes it: `$SI` 0x06, `$FILE_NAME` 0x10000006) and the unelevated test `Directory_without_the_directory_attribute_in_standard_information_is_indexed_as_a_directory` (parser → stat → IndexStore). The other fixtures regenerated byte-identical.
+- The elevated test asserts `IsDirectory` parity for every entry against the filesystem, and replaces `BeEquivalentTo` on 10k-path sets (2m17s run) with set differences that print the first 20 differences.
+- Default suite 745: 742 passed, 0 failed, 3 skipped. Scanner: 92 files, exit 0. Next: re-run `eng\run-elevated-tests.ps1`.
+
+### 2026-10-22 (c) — Subagent 2: P3.24 fix, NTFS metafile exclusion
+- P3.24: added `RefinementBuffer`, which keeps contiguous folded names per result partition; refinement is a vectorized scan and selects without copying.
+  - Before: broad keystrokes about 2.9 ms p50 (unit chain, AC) / 1.9 ms (probe, battery).
+  - After, on AC (BenchmarkDotNet `BroadRefinementBenchmarks`, base query in iteration setup): `in`→`inv` median 0.60 ms, `re`→`rep` 0.66 ms, `invoice_0`→`invoice_00` 0.14 ms; narrow keystroke 53 µs.
+  - The unit test asserts p50 ≤ 1 ms and p95 ≤ 3 ms again (2× gate).
+  - Cost: cold name-only queries now copy their matches' names, e.g. cold `invoice_00` 1.8–1.9 ms (was 0.8–1.4 ms) and cold `in` (167k results) 5.2–6.6 ms. Both remain within the cold budget (p95 ≤ 15 ms).
+- The elevated run by the user found a product bug: NTFS metafiles (`$Quota`, …) were indexed. They are now excluded by record number and `$Extend` ancestry in enumeration and journal; in-process elevated mode applies the user's AccessCheck (walker parity). Unit-tested; the elevated test asserts parity with directory enumeration.
+- 4 of 5 elevated tests had passed in that run; the 5th needs a re-run of `eng\run-elevated-tests.ps1` (added by the orchestrator, committed unchanged).
+- Default suite 744: 741 passed, 0 failed, 3 skipped. Scanner: 92 files, exit 0.
+
+### 2026-10-22 — Subagent 2 (Core Systems & Indexing Engine Engineer)
+- Phase 3 on branch `phase3-core-search` (worktree `C:\Users\Ewais\Projects\NexPane\.worktrees\phase3`), 13 commits from `2017395` to the docs commit; not merged into main (the orchestrator merges).
+- Delivered:
+  - VfsPath and the VFS contracts; SQLite storage with migrations and settings.json.
+  - The in-memory index (Core read model + Indexing writer, compaction, snapshot persistence).
+  - The query language (parser, printer, evaluators, planner, parallel executor, live queries), tags, categories and dupe.
+  - The content pipeline (queue, extractors, FTS5).
+  - The local file system provider and RDCW watcher; the parallel walker and source selection.
+  - NTFS parsing (USN, MFT), volume IOCTLs, AccessCheck, the Index Service pipe protocol/server/client and the network crawler.
+  - The benchmarks project.
+- Not run: the `[Elevated]` tests (USN/MFT VHDX, journal reset, service as admin, SMB share). Run them from an elevated terminal with `dotnet test --project tests/NexPane.Indexing.Tests -c Release --filter-trait "Category=Elevated"` (and the same for `tests/NexPane.IndexService.Tests`). Hyper-V is not needed; the tests use diskpart.
+- Incident: early in the session a .NET `[IO.File]` call with a relative path wrote three empty files into the main checkout. They were deleted at once; the orchestrator confirmed main is clean. Rule: use absolute worktree paths only.
+- The machine ran on battery for most measurements. Timing gates in the unit suite assert 2× the budget and skip only when exceeded on battery power.
 
 ### 2026-10-21 (f) — Subagent 6 (QA, Verification & Security Inspector)
 - Re-ran P1.02, P1.07, P1.08, P1.13, P1.14 independently after 180b0c0; verdicts in §3. Checked the roster remap in TODO.md.

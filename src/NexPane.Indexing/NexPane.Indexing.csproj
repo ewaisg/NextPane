@@ -10,4 +10,22 @@
     <ProjectReference Include="..\NexPane.Storage\NexPane.Storage.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="DocumentFormat.OpenXml" />
+    <PackageReference Include="MimeKit" />
+    <PackageReference Include="OpenMcdf" />
+    <PackageReference Include="PdfPig" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="NexPane.Indexing.Tests" />
+    <InternalsVisibleTo Include="NexPane.IndexService.Tests" />
+    <InternalsVisibleTo Include="NexPane.Benchmarks" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
 </Project>

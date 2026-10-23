@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NexPane.IndexService\NexPane.IndexService.csproj" />
+    <ProjectReference Include="..\..\src\NexPane.Search\NexPane.Search.csproj" />
   </ItemGroup>
 
 </Project>

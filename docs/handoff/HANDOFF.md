@@ -1,7 +1,7 @@
 # NexPane — Session Handoff Briefing
 
 > Read this first in every new session, then `STATE.md` (exact current state), then the relevant phase of `TODO.md`, then the referenced sections of `ARCHITECTURE.md`.
-> Last update: 2026-10-21 (k) by the orchestrator: merged `phase2-branding` into `main`. Phase 1 complete (14/14) and Phase 2 complete (P2.01–P2.09 `[VERIFIED_COMPLETE]`).
+> Last update: 2026-10-23 (m) by the orchestrator: merged `phase3-core-search` into `main` — Phases 1–3 complete (Phase 3 gate P3.36 passed at b2ee822; all P3.01–P3.39 `[VERIFIED_COMPLETE]`).
 
 ## 1. Executive summary
 
@@ -21,7 +21,9 @@ The build → test → publish → installer pipeline (P1.11) is scripted in `en
 
 **Phase 2 (branding) is verified (S6, 2026-10-21):** generated assets in `assets/`, `tools/NexPane.AssetGen` (re-run: `dotnet run -c Release --project tools/NexPane.AssetGen -- --svg assets/brand/nexpane-logo.svg --mark assets/brand/nexpane-mark.svg --out assets`; output must stay byte-identical, enforced by `AssetGenDeterminismTests`), exe/window/setup icons, tray icon interop and theme tokens. Release installers now compile without `-AllowMissingBranding`. In the notification area use `tray-light.ico`/`tray-dark.ico` (via `TrayIcon.VariantForCurrentTaskbar()`), not the full-colour `tray.ico`.
 
-Phase 2 is merged into `main`. Phase 3 (S2, core systems) runs in its own worktree `.worktrees\phase3` on branch `phase3-core-search`. Do not edit that worktree from `main`.
+**Phase 3 QA gate (S6, 2026-10-23): PASSED** at b2ee822 (the 2026-10-22 rejections P3.11, P3.13, P3.14, P3.16, P3.22, P3.31 are fixed and verified, as are P3.34, P3.37, P3.38, P3.39). Merge `phase3-core-search` into main following STATE §3, then re-run `eng\build.ps1`.
+
+Phase 3 is merged into `main`. Next: Phase 4 (dual-pane UI, tabs, preview, native shell integration).
 
 ## 2. Files currently being worked on
 
@@ -39,7 +41,10 @@ Phase 2 is merged into `main`. Phase 3 (S2, core systems) runs in its own worktr
 | `ARCHITECTURE.md` §19.3 + §21 (uninstall user-data handling), §13.2 GPU row, TODO P4.43 / P6.30 / P7.08 / P7.14 | `[VERIFIED_COMPLETE]` (P1.02, S6 2026-10-21 after 5f64ea8); implementation work is P4.43 (S3) and P7.14 (S7) |
 | `eng/build.ps1`, `eng/publish.ps1`, `eng/installer.ps1`, `installer/NexPane.iss`, `eng/placeholder-allowlist.json` | Cross-references reworded to "task(s) P1.11"; the allowlist is empty; scanner exit 0 |
 | `assets/brand/*.svg`, `assets/icons/*`, `assets/installer/*`, `tools/NexPane.AssetGen`, `tests/NexPane.AssetGen.Tests`, `src/NexPane.App/Themes/Tokens.xaml`, `src/NexPane.Shell/Tray/*` | `[VERIFIED_COMPLETE]` (Phase 2, S7; gate P2.09 by S6), merged into `main`; the installer now compiles **with** branding |
-| Next up | Phases 1–2 closed. S2 Phase 3 in `.worktrees\phase3` (branch `phase3-core-search`); S6 runs gate P3.36 there, then the orchestrator merges into `main` |
+| Phase 3 (S2, merged into `main`) | `src/NexPane.Core/{Vfs,Indexing,Search}` (VfsPath, VFS contracts, index read model, query AST, search contracts); `src/NexPane.Storage` (SQLite factory, migrations, single writer, settings.json); `src/NexPane.Indexing/{Store,Sources,Content,Ntfs,Service}`; `src/NexPane.Search/{Language,Execution,Live,Tags,Categories}`; `src/NexPane.Shell/{FileSystem,Content,Security}`; `src/NexPane.IndexService/IndexPipeServer.cs`; `tests/NexPane.Benchmarks` (+README); fixtures `tests/TestAssets/{content,usn,mft}`. QA gate P3.36: 28 verified. Since then: P3.16, P3.22, P3.31 and P3.39 (internal implementations, `AddShell`/`AddIndexing`/`AddSearch`) `[VERIFIED_COMPLETE]`; P3.10, P3.11, P3.13, P3.14 and P3.38 wait for the elevated run (`eng\run-elevated-tests.ps1`) |
+| P3.34 (S3, merged into `main`) | `src/NexPane.Shell/{IShellLauncher.cs, ShellServiceCollectionExtensions.cs, Launch/*, Threading/ShellStaScheduler.cs}`, `tests/NexPane.Shell.Tests/{Launch,Threading}/*` — `[VERIFIED_COMPLETE]`. Gotchas: for a type with no association the default and `open` verbs belong to `HKCR\Unknown` and start the "Pick an app" prompt (OpenWith.exe) as a *successful* launch even with `SEE_MASK_FLAG_NO_UI`, so tests that expect `NoAssociation` must use another verb (e.g. `print`) or they leave a dialog on screen; Shell APIs get paths ≤ 259 chars (longer file-system paths go through the 8.3 name, else `PathTooLong`); new Shell STA work goes through `ShellStaScheduler.RunAsync` |
+| `tests/NexPane.Architecture.Tests/TypeLevelRulesTests.cs` (S1, 2026-10-22) | P3.37 `[VERIFIED_COMPLETE]`: NetArchTest.Rules type-level rules R1–R3 in the default suite. R4 ("Core-contract implementations are internal") is an **explicit** test until S2 makes 7 Phase 3 classes internal; run it with `NexPane.Architecture.Tests.exe -explicit only`. Gotcha: NetArchTest namespace matching works on whole segments, so use `"System.Windows"`, not `"System.Windows."` |
+| Next up | Phases 1–3 closed and merged. Phase 4 (S5 UI with S3 native shell) next; S6 verifies each `[READY_FOR_QA]` item |
 
 ## 3. Environment setup
 
@@ -91,6 +96,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\check-placeholders.ps1
 dotnet test --solution NexPane.sln -c Release --filter-not-trait "Category=Elevated" --filter-not-trait "Category=Live"
 # Elevated suite (from an elevated terminal):
 dotnet test --solution NexPane.sln -c Release --filter-trait "Category=Elevated"
+# Or, for the Phase 3 suites (Indexing + IndexService; VHDX via diskpart, SMB share, a LocalSystem test service via sc create
+# and a non-elevated client via runas /trustlevel), with a log for QA in build\elevated-tests.log (UTF-16, UTC times, measurements).
+# Commit first: the runner refuses a dirty working tree (-AllowDirty logs DIRTY + git status --porcelain).
+powershell -NoProfile -ExecutionPolicy Bypass -File eng\run-elevated-tests.ps1
 # Single project:
 dotnet test --project tests/NexPane.Architecture.Tests -c Release
 # Benchmarks
@@ -136,6 +145,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
 6. **Long paths.** Use `\\?\` / `\\?\UNC\` prefixes for Win32 file APIs (.NET does this automatically). Shell APIs (PIDLs, IContextMenu, ShellExecuteEx, preview handlers) are limited to MAX_PATH; fall back to the built-in menus and operations with a notice.
 7. **ShellExecuteEx** must run on an STA with `SEE_MASK_NOASYNC` (otherwise DDE-based launches can be dropped when the calling thread exits), plus `SEE_MASK_INVOKEIDLIST` for PIDL-based items.
 8. **USN/MFT needs admin.** The app must run unelevated, because UIPI breaks drag/drop with Explorer when it is elevated. Fast NTFS indexing goes through `NexPane.IndexService` (service `NexPaneIndex`, LocalSystem) over `\\.\pipe\NexPane.Index.v1`. The service filters results with `AccessCheck` against the client token. The installer task is **checked by default** in admin installs and shows a privacy note.
+   - **Raw `$MFT` attributes:** NTFS `$STANDARD_INFORMATION` never sets FILE_ATTRIBUTE_DIRECTORY (0x10). A directory is the record header flag 0x0002 (0x10000000 in `$FILE_NAME`). `MftReader.ToStat` maps it; reserved records 0–23 and the `$Extend` subtree are not user files (`NtfsMetafiles`).
 9. **ReadDirectoryChangesW buffers.** The maximum over SMB is 64 KB. Treat `ERROR_NOTIFY_ENUM_DIR` and zero-byte completions as an overflow and rewalk the subtree.
 10. **Single writer** for the in-memory index and for each SQLite DB. Readers use immutable generations (index) and WAL (SQLite).
 11. **Regex from users** uses `RegexOptions.NonBacktracking`; fall back to backtracking only with a timeout.
@@ -166,6 +176,24 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng\installer.ps1 -AllowMiss
     - `System.Drawing.Icon(path, size)` ignores PNG-compressed .ico entries when it picks a frame (it returns 128 for a request of 256). Use Win32 `LoadImage`/`ExtractIconEx`, or decode the PNG frame directly.
     - AssetGen output is byte-identical between runs on the same machine. Skia's raster code may differ across CPU feature sets, so if the committed-assets test fails on another machine, regenerate there and compare the result visually before committing.
     - In PowerShell, use absolute paths with `[IO.File]` calls: .NET resolves relative paths against the process working directory, which can be the main checkout rather than the worktree.
+25. **Use absolute paths everywhere (worktrees).** In PowerShell, `[IO.File]` and other .NET calls resolve relative paths against the *process* directory, not `Set-Location`. In a worktree, a relative path silently writes into the main checkout. The Write/Edit tools also resolve relative paths against the main checkout.
+26. **Index layering (§21):** the index read model (`IndexSegment`, `IndexGeneration`) lives in Core so that Search can scan it without referencing Indexing. Only the index writer thread may call the `IndexSegment` mutation methods. Readers capture `IndexStore.CurrentGeneration` and bound iteration by `Count(segment)`.
+27. **xUnit v3 analyzers** require `TestContext.Current.CancellationToken` for every CancellationToken parameter in tests (xUnit1051 is an error under warnings-as-errors).
+28. **Placeholder scanner traps in src:**
+    - the word "placeholder" in comments;
+    - `mock`/`fake`/`stub` anywhere in identifiers or text;
+    - comment-only `catch` blocks (give them a statement);
+    - `Task.Delay` (use `PeriodicTimer` or a timed `SemaphoreSlim.Wait`).
+29. **Named pipes:** the server can impersonate the client (`RunAsClient`) only after it has read data from it. The Index Service therefore impersonates after the client's `Hello`.
+30. **Parent-index directory times:** a listing reports a sub-directory's mtime from the parent's index entry, which can be stale. The crawler stats each sub-directory itself before deciding to skip its listing.
+31. **MsgReader is not used** (it pulls in Maui.Graphics and Win2D). `.msg` text comes from OpenMcdf (§21). The PdfPig NuGet id is `PdfPig`, not `UglyToad.PdfPig`.
+32. **Timing tests and power:** the unit suite asserts 2× the §17 budgets and skips only when a gate is exceeded on battery power. Precise numbers come from `tests/NexPane.Benchmarks`, run on AC power.
+33. **Elevated suites:**
+    - `--filter-trait "Category=Elevated"` on `tests/NexPane.Indexing.Tests` creates and mounts a 256 MB VHDX with diskpart (no Hyper-V module needed);
+    - the same filter on `tests/NexPane.IndexService.Tests` runs the NTFS backend over the system volume;
+    - the SMB crawler test uses `New-SmbShare`.
+
+- **QA gotchas from P3.36:** (a) `NamedPipeClientStream` without a `TokenImpersonationLevel` lets the server fully impersonate the client — always pass `Identification` unless impersonation is really needed, and verify who owns the pipe; (b) completion callbacks of overlapped I/O and `Dispose` must agree on ownership under one lock before freeing native memory; (c) a regex timeout per `IsMatch` call is not a ReDoS guard for a million-entry scan — bound the whole evaluation; (d) privacy filters must apply the same ancestor rule to enumeration and to journal changes; (e) `(Get-Date).ToString('u')` prints local time with a `Z` — use `.ToUniversalTime()` first.
 
 ## 7. Working rules
 

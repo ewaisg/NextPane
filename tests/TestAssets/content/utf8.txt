@@ -1,0 +1,2 @@
+Café menu — the invoice total is 42 €.
+Second line.
