@@ -6,7 +6,7 @@ namespace NexPane.Indexing.Ntfs;
 /// <summary>
 /// Real Index Service backend (P3.10–P3.14): lists fixed NTFS volumes (creating the change journal when absent,
 /// 32 MB / 8 MB delta), enumerates a volume from the raw $MFT filtered by the client's <c>canList</c> check, and tails
-/// <c>FSCTL_READ_USN_JOURNAL</c> every 250 ms, dropping changes inside folders the client cannot list. Requires
+/// <c>FSCTL_READ_USN_JOURNAL</c> every 250 ms, dropping changes below any folder the client cannot list (<see cref="JournalAccessFilter"/>). Requires
 /// administrator rights (LocalSystem service, or the app running elevated in-process).
 /// </summary>
 public sealed class NtfsVolumeBackend : IIndexVolumeBackend
@@ -96,7 +96,7 @@ public sealed class NtfsVolumeBackend : IIndexVolumeBackend
         ArgumentNullException.ThrowIfNull(sink);
         var info = Find(volumeGuid);
         using var volume = NtfsVolume.Open(info.Root);
-        var verdicts = new Dictionary<ulong, bool> { [info.RootFileReference] = canList(info.Root) };
+        var access = new JournalAccessFilter(canList, frn => FileReferencePath.TryGet(volume.Handle, frn), info.RootFileReference, info.Root);
         var excluded = _excludedDirectories.GetValueOrDefault(volumeGuid) ?? [];
         var buffer = new byte[64 * 1024];
         var next = fromUsn;
@@ -121,7 +121,7 @@ public sealed class NtfsVolumeBackend : IIndexVolumeBackend
                 foreach (var record in parsed.Records)
                 {
                     if (record.FileName is null || NtfsMetafiles.IsExcludedChange(record.FileReferenceLow, record.ParentReferenceLow, excluded) ||
-                        !Listable(volume, record.ParentReferenceLow, verdicts, canList))
+                        !access.IsVisible(record))
                     {
                         continue;
                     }
@@ -143,19 +143,6 @@ public sealed class NtfsVolumeBackend : IIndexVolumeBackend
             }
         }
         while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false));
-    }
-
-    private static bool Listable(NtfsVolume volume, ulong parent, Dictionary<ulong, bool> verdicts, Func<string, bool> canList)
-    {
-        if (verdicts.TryGetValue(parent, out var known))
-        {
-            return known;
-        }
-
-        var path = FileReferencePath.TryGet(volume.Handle, parent);
-        var verdict = path is not null && canList(path);
-        verdicts[parent] = verdict;
-        return verdict;
     }
 
     private VolumeInfoMessage Find(string volumeGuid) =>

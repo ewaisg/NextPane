@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using NexPane.Core.Indexing;
 using NexPane.Indexing.Ntfs;
 using NexPane.Indexing.Store;
@@ -131,6 +133,63 @@ public sealed class ElevatedVolumeTests : IAsyncLifetime
         source.FullScans.Should().Be(1);
         await cts.CancelAsync();
         await running.ContinueWith(_ => { }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Denied_directory_subtree_is_hidden_in_the_enumeration_and_in_live_changes()
+    {
+        // P3.14: the real NtfsVolumeBackend (the service's code) with the user's AccessCheck. A deny-list ACE on
+        // "private" (not inherited, so "a" and "b" below it stay listable themselves) must hide the whole subtree.
+        var root = _vhd.Root;
+        var deep = Directory.CreateDirectory(Path.Combine(root, "private", "a", "b"));
+        File.WriteAllText(Path.Combine(deep.FullName, "secret-initial.txt"), "s");
+        Directory.CreateDirectory(Path.Combine(root, "public"));
+        File.WriteAllText(Path.Combine(root, "public", "visible-initial.txt"), "v");
+        var denied = new DirectoryInfo(Path.Combine(root, "private"));
+        var rule = new FileSystemAccessRule(WindowsIdentity.GetCurrent().User!, FileSystemRights.ListDirectory, AccessControlType.Deny);
+        var security = denied.GetAccessControl();
+        security.AddAccessRule(rule);
+        denied.SetAccessControl(security);
+        try
+        {
+            var backend = new NtfsVolumeBackend();
+            var volume = backend.ListVolumes().Single(v => v.Root.Equals(root, StringComparison.OrdinalIgnoreCase));
+            await using var store = new IndexStore();
+            var segment = await store.RegisterVolumeAsync(new IndexVolumeInfo(root, VolumeKind.NtfsFixed, VolumeSerial: volume.Serial), volume.RootFileReference, Ct);
+            var source = new UsnVolumeSource(store, segment, volume);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+            var running = source.RunInProcessAsync(backend, new JournalPosition(null, null), null, cts.Token);
+
+            await WaitFor(() => Count(store, segment, n => n == "visible-initial.txt") == 1, TimeSpan.FromSeconds(30));
+            var initial = Names(store, segment);
+            initial.Should().Contain(["private", "public", "visible-initial.txt"], "siblings and the denied folder's own entry are listable");
+            initial.Should().NotContain(["a", "b", "secret-initial.txt"], "nothing below the denied folder is enumerated");
+
+            // Live: names created two levels below the denied folder must not reach the index.
+            File.WriteAllText(Path.Combine(deep.FullName, "secret-live.txt"), "s");
+            Directory.CreateDirectory(Path.Combine(deep.FullName, "c"));
+            File.WriteAllText(Path.Combine(root, "public", "visible-live.txt"), "v");
+            await WaitFor(() => Count(store, segment, n => n == "visible-live.txt") == 1, TimeSpan.FromSeconds(5));
+            await Task.Delay(NtfsVolumeBackend.PollInterval * 4, Ct); // later polls would have delivered a leak by now
+            var live = Names(store, segment);
+            live.Should().NotContain(["secret-live.txt", "c", "a", "b", "secret-initial.txt"]);
+            ElevatedMetrics.Write($"Deny-ACL subtree on {root}: {live.Count} visible names, none below the denied folder (initial and live)");
+
+            await cts.CancelAsync();
+            await running.ContinueWith(_ => { }, CancellationToken.None);
+        }
+        finally
+        {
+            security.RemoveAccessRule(rule);
+            denied.SetAccessControl(security);
+        }
+    }
+
+    private static HashSet<string> Names(IndexStore store, SegmentHandle segment)
+    {
+        var g = store.CurrentGeneration;
+        var s = g.GetSegment(segment.Id);
+        return Enumerable.Range(1, g.Count(segment.Id) - 1).Where(i => !s.IsDeleted(i)).Select(i => s.GetName(i).ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static int Count(IndexStore store, SegmentHandle segment, Func<string, bool> name)

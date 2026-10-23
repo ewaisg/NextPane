@@ -279,8 +279,8 @@ public static class FileReferencePath
         }
 
         var path = new string(buffer, 0, (int)length);
-        return path.StartsWith(@"\?\UNC\", StringComparison.Ordinal) ? @"\\" + path[8..]
-            : path.StartsWith(@"\?\", StringComparison.Ordinal) ? path[4..] : path;
+        return path.StartsWith(@"\\?\UNC\", StringComparison.Ordinal) ? @"\\" + path[8..]
+            : path.StartsWith(@"\\?\", StringComparison.Ordinal) ? path[4..] : path;
     }
 
     [StructLayout(LayoutKind.Sequential)]

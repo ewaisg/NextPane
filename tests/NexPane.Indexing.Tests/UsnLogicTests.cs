@@ -88,6 +88,65 @@ public sealed class UsnLogicTests
     }
 
     [Fact]
+    public void Journal_changes_below_a_denied_directory_are_hidden_at_any_depth()
+    {
+        // Regression (QA P3.36): only the direct parent was checked, so names created deep inside a denied folder leaked.
+        var paths = new Dictionary<ulong, string>
+        {
+            [20] = @"M:\public",
+            [21] = @"M:\private",
+            [22] = @"M:\private\a",
+            [23] = @"M:\private\a\b",
+            [24] = @"M:\public\deep\er",
+        };
+        var denied = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { @"M:\private" };
+        var filter = new JournalAccessFilter(p => !denied.Contains(p), frn => paths.GetValueOrDefault(frn), 5, @"M:\");
+
+        filter.IsVisible(Record(100, 5, "top.txt", UsnReason.FileCreate)).Should().BeTrue();
+        filter.IsVisible(Record(101, 20, "a.txt", UsnReason.FileCreate)).Should().BeTrue();
+        filter.IsVisible(Record(102, 24, "deep.txt", UsnReason.FileCreate)).Should().BeTrue();
+        filter.IsVisible(Record(103, 5, "private", UsnReason.BasicInfoChange, directory: true)).Should().BeTrue("the denied folder itself is listed in a listable root");
+        filter.IsVisible(Record(104, 21, "secret.txt", UsnReason.FileCreate)).Should().BeFalse();
+        filter.IsVisible(Record(105, 22, "nested.txt", UsnReason.FileCreate)).Should().BeFalse();
+        filter.IsVisible(Record(106, 23, "deepest-secret.txt", UsnReason.FileCreate)).Should().BeFalse("every ancestor must be listable");
+        filter.IsVisible(Record(107, 99, "orphan.txt", UsnReason.FileCreate)).Should().BeFalse("unresolvable parents fail closed");
+    }
+
+    [Fact]
+    public void Journal_access_cache_is_invalidated_by_security_changes_and_directory_moves_and_is_bounded()
+    {
+        var paths = new Dictionary<ulong, string> { [20] = @"M:\shared", [21] = @"M:\vault", [22] = @"M:\shared\project" };
+        var denied = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var filter = new JournalAccessFilter(p => !denied.Contains(p), frn => paths.GetValueOrDefault(frn), 5, @"M:\", capacity: 16);
+
+        filter.IsVisible(Record(100, 20, "a.txt", UsnReason.FileCreate)).Should().BeTrue();
+
+        // ACL tightened on M:\shared: the directory's SECURITY_CHANGE record invalidates the cached verdicts.
+        denied.Add(@"M:\shared");
+        filter.IsVisible(Record(20, 5, "shared", UsnReason.SecurityChange | UsnReason.Close, directory: true)).Should().BeTrue();
+        filter.IsVisible(Record(101, 20, "b.txt", UsnReason.FileCreate)).Should().BeFalse();
+        filter.IsVisible(Record(102, 22, "c.txt", UsnReason.FileCreate)).Should().BeFalse();
+
+        // ACL relaxed again, then "project" is moved into the denied vault: the rename invalidates and its files hide.
+        denied.Clear();
+        denied.Add(@"M:\vault");
+        filter.IsVisible(Record(20, 5, "shared", UsnReason.SecurityChange, directory: true)).Should().BeTrue();
+        filter.IsVisible(Record(103, 22, "d.txt", UsnReason.FileCreate)).Should().BeTrue();
+        paths[22] = @"M:\vault\project";
+        filter.IsVisible(Record(22, 21, "project", UsnReason.RenameNewName, directory: true)).Should().BeFalse();
+        filter.IsVisible(Record(104, 22, "e.txt", UsnReason.FileCreate)).Should().BeFalse("the moved directory is now below a denied folder");
+        filter.Invalidations.Should().BeGreaterThanOrEqualTo(3);
+
+        // Bounded: thousands of distinct directories never grow the cache past its capacity.
+        for (ulong d = 1000; d < 5000; d++)
+        {
+            paths[d] = $@"M:\shared\d{d}";
+            filter.IsVisible(Record(d + 100_000, d, "x.txt", UsnReason.FileCreate)).Should().BeTrue();
+            filter.CachedVerdicts.Should().BeLessThanOrEqualTo(16 + 3);
+        }
+    }
+
+    [Fact]
     public void Access_check_honors_a_deny_ace_for_the_current_user()
     {
         var root = Path.Combine(Path.GetTempPath(), "nexpane-acl-" + Guid.NewGuid().ToString("N"));
@@ -176,8 +235,8 @@ public sealed class UsnLogicTests
         NtfsMetafiles.IsReserved(0x000100000000000B).Should().BeTrue("record 11 is $Extend");
     }
 
-    private static UsnRecord Record(ulong frn, ulong parent, string name, UsnReason reason) =>
-        new(2, 0, frn, parent, 0, 0, reason, 0, 0, 0x20, name, [], 0);
+    private static UsnRecord Record(ulong frn, ulong parent, string name, UsnReason reason, bool directory = false) =>
+        new(2, 0, frn, parent, 0, 0, reason, 0, 0, directory ? 0x10u : 0x20u, name, [], 0);
 
     private static MftStat Dir(ulong frn, ulong parent, string name, uint securityId) => new(frn, parent, name, 0x10, 0, 0, 0, true, securityId);
 

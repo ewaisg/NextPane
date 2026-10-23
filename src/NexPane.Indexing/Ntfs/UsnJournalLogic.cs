@@ -200,3 +200,119 @@ public sealed class AccessFilter(Func<string, bool> canList)
         return verdict;
     }
 }
+
+/// <summary>
+/// Journal-side privacy filter (§7.5, P3.14): a change is streamed to the client only when its parent directory and
+/// every ancestor up to the volume root are listable by the client, the same rule <see cref="AccessFilter"/> applies to
+/// the initial enumeration (a denied directory hides its whole subtree). Verdicts are cached per directory reference and
+/// per ancestor path; the caches are cleared when a directory's security descriptor changes, a directory is renamed or
+/// moved (into or out of a protected tree) or deleted, and whenever they reach <paramref name="capacity"/> entries.
+/// </summary>
+public sealed class JournalAccessFilter(Func<string, bool> canList, Func<ulong, string?> directoryPathOf, ulong rootReference, string rootPath,
+    int capacity = JournalAccessFilter.DefaultCapacity)
+{
+    public const int DefaultCapacity = 8192;
+
+    private const UsnReason InvalidatingDirectoryReasons = UsnReason.SecurityChange | UsnReason.RenameOldName | UsnReason.RenameNewName | UsnReason.FileDelete;
+
+    private readonly Dictionary<ulong, bool> _byDirectory = [];
+    private readonly Dictionary<string, bool> _byPath = new(StringComparer.OrdinalIgnoreCase);
+    private readonly string _root = rootPath.TrimEnd('\\');
+
+    /// <summary>Number of <c>canList</c> calls (diagnostics).</summary>
+    public int Checks { get; private set; }
+
+    /// <summary>Number of cache invalidations (security change, directory move/delete, capacity).</summary>
+    public int Invalidations { get; private set; }
+
+    public int CachedVerdicts => _byDirectory.Count + _byPath.Count;
+
+    public bool IsVisible(UsnRecord record)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        if (record.IsDirectory && (record.Reason & InvalidatingDirectoryReasons) != 0)
+        {
+            Invalidate();
+        }
+
+        return DirectoryVisible(record.ParentReferenceLow);
+    }
+
+    public void Invalidate()
+    {
+        if (_byDirectory.Count > 0 || _byPath.Count > 0)
+        {
+            _byDirectory.Clear();
+            _byPath.Clear();
+            Invalidations++;
+        }
+    }
+
+    private bool DirectoryVisible(ulong directory)
+    {
+        if (_byDirectory.TryGetValue(directory, out var known))
+        {
+            return known;
+        }
+
+        if (CachedVerdicts >= capacity)
+        {
+            Invalidate();
+        }
+
+        string? path = directory == rootReference ? _root : directoryPathOf(directory);
+        if (path is null)
+        {
+            return false; // unresolvable (deleted meanwhile): fail closed, not cached
+        }
+
+        var verdict = AncestorsListable(path.TrimEnd('\\'));
+        _byDirectory[directory] = verdict;
+        return verdict;
+    }
+
+    private bool AncestorsListable(string path)
+    {
+        if (!path.StartsWith(_root, StringComparison.OrdinalIgnoreCase) || (path.Length > _root.Length && path[_root.Length] != '\\'))
+        {
+            return false; // not below this volume's root: fail closed
+        }
+
+        if (!PathListable(_root + "\\"))
+        {
+            return false;
+        }
+
+        if (path.Length <= _root.Length + 1)
+        {
+            return true; // the root itself
+        }
+
+        for (var end = path.IndexOf('\\', _root.Length + 1); ; end = path.IndexOf('\\', end + 1))
+        {
+            var ancestor = end < 0 ? path : path[..end];
+            if (ancestor.Length > _root.Length && !PathListable(ancestor))
+            {
+                return false;
+            }
+
+            if (end < 0)
+            {
+                return true;
+            }
+        }
+    }
+
+    private bool PathListable(string path)
+    {
+        if (_byPath.TryGetValue(path, out var known))
+        {
+            return known;
+        }
+
+        Checks++;
+        var verdict = canList(path);
+        _byPath[path] = verdict;
+        return verdict;
+    }
+}
